@@ -1,53 +1,86 @@
 # QIANDUAN
 
-This template should help get you started developing with Vue 3 in Vite.
+一个基于 Vue 3 + TypeScript + Vite 的前端项目，提供「自选股管理 + 板块分析可视化 + AI 流式对话」的交互体验。
 
-## Recommended IDE Setup
+## 项目特性
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- 自选股区
+  - 支持按股票名/代码添加股票。
+  - 支持删除股票、查看个股详情与关键指标。
+  - 内置过渡动画与交互状态控制。
+- 板块分析区
+  - 展示资金关注度与市场情绪饼图。
+  - 支持一键刷新板块模拟数据。
+  - Chart.js 采用运行时动态加载，避免安装依赖受限时阻塞页面功能。
+- AI 对话区
+  - 支持多会话历史管理（新建、切换、删除）。
+  - 支持 SSE 流式响应与推理模式切换。
+  - 对话历史持久化到浏览器 LocalStorage。
 
-## Recommended Browser Setup
+## 技术栈
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+- 前端框架：Vue 3（Composition API）
+- 构建工具：Vite
+- 语言：TypeScript
+- 状态管理：Pinia
+- 路由：Vue Router
+- 单元测试：Vitest + Vue Test Utils + jsdom
+- 端到端测试：Playwright
+- 代码质量：ESLint + Oxlint + Prettier
 
-## Type Support for `.vue` Imports in TS
+## 运行环境
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+- Node.js：^20.19.0 或 >=22.12.0
+- npm：建议使用与 Node 版本匹配的最新稳定版
 
-## Customize configuration
+## 快速开始
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+1. 安装依赖
 
-## Project Setup
-
-```sh
+```bash
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+2. 启动开发环境
 
-```sh
+```bash
 npm run dev
 ```
 
-## AI SSE 对接
+3. 本地预览生产构建
 
-前端聊天区已接入 SSE 流式协议，默认请求地址为 `/chat/endpoint`。
+```bash
+npm run build
+npm run preview
+```
 
-开发环境下，Vite 已将 `/chat` 自动代理到 `http://localhost:8000`。
+## 可用脚本
 
-如需改为其他后端地址，可在项目根目录创建 `.env.local`：
+```bash
+npm run dev          # 启动开发服务器
+npm run build        # 类型检查 + 生产构建
+npm run build-only   # 仅执行 Vite 构建
+npm run preview      # 预览构建产物
+npm run type-check   # 仅执行 vue-tsc 类型检查
+npm run test:unit    # 运行 Vitest 单元测试
+npm run test:e2e     # 运行 Playwright E2E 测试
+npm run lint         # 执行 Oxlint + ESLint（自动修复）
+npm run format       # 使用 Prettier 格式化 src/
+```
 
-```sh
+## AI SSE 接入说明
+
+聊天区默认请求地址：/chat/endpoint
+
+开发环境下，Vite 会将 /chat 代理到：http://localhost:8000
+
+如需指定完整后端地址，可在项目根目录创建 .env.local：
+
+```bash
 VITE_AI_CHAT_ENDPOINT=http://localhost:8000/chat/endpoint
 ```
 
-请求体会按以下字段发送：
+前端发送请求体示例：
 
 ```json
 {
@@ -58,41 +91,61 @@ VITE_AI_CHAT_ENDPOINT=http://localhost:8000/chat/endpoint
 }
 ```
 
-前端支持解析事件：`start`、`reasoning`、`tool_call`、`tool_result`、`message`、`error`、`end`。
+前端支持解析以下 SSE 事件：
 
-### Type-Check, Compile and Minify for Production
+- start
+- reasoning
+- tool_call
+- tool_result
+- message
+- error
+- end
 
-```sh
-npm run build
+## 目录结构
+
+```text
+QIANDUAN/
+  src/
+    App.vue                # 主页面（自选股、板块分析、AI 对话）
+    main.ts                # 应用入口
+    router/index.ts        # 路由配置
+    stores/counter.ts      # Pinia 示例 store
+    __tests__/App.spec.ts  # 单元测试示例
+  e2e/
+    vue.spec.ts            # Playwright E2E 示例
+  vite.config.ts           # Vite 配置（含 /chat 代理）
+  vitest.config.ts         # Vitest 配置
+  playwright.config.ts     # Playwright 配置
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+## 测试说明
 
-```sh
+- 单元测试
+
+```bash
 npm run test:unit
 ```
 
-### Run End-to-End Tests with [Playwright](https://playwright.dev)
+- 端到端测试
 
-```sh
-# Install browsers for the first run
+```bash
 npx playwright install
-
-# When testing on CI, must build the project first
-npm run build
-
-# Runs the end-to-end tests
 npm run test:e2e
-# Runs the tests only on Chromium
-npm run test:e2e -- --project=chromium
-# Runs the tests of a specific file
-npm run test:e2e -- tests/example.spec.ts
-# Runs the tests in debug mode
-npm run test:e2e -- --debug
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+说明：当前 e2e/vue.spec.ts 为示例用例，请根据现有页面结构与文案调整断言后再用于稳定回归。
 
-```sh
-npm run lint
-```
+## CI 说明
+
+仓库包含 GitHub Actions 工作流：
+
+- 触发条件：push 到 master
+- 执行内容：npm ci -> npm run build
+- 产物上传：dist
+
+## 开发建议
+
+- 推荐 IDE：VS Code + Vue Official (Volar)
+- 推荐浏览器插件：Vue.js devtools
+- 提交前建议至少执行：npm run lint && npm run test:unit
+
