@@ -1018,7 +1018,7 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
-<style scoped>
+<style>
 .app-page {
   --bg: #f4f7fb;
   --card: #ffffff;
