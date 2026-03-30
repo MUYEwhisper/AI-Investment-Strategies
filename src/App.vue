@@ -37,9 +37,19 @@ type SseFrame = {
 
 type ChatSession = {
   id: string
+  agentId: string
   title: string
   createdAt: string
   messages: ChatMessage[]
+}
+
+type AgentProfile = {
+  id: string
+  name: string
+  subtitle: string
+  description: string
+  greeting: string
+  primary?: boolean
 }
 
 type ChartInstance = {
@@ -60,6 +70,82 @@ const LIST_ITEM_ANIM_MS = 220
 const CHAT_SWITCH_MS = 220
 const STORAGE_KEY = 'ai_invest_chat_history'
 const AI_CHAT_ENDPOINT = (import.meta.env.VITE_AI_CHAT_ENDPOINT as string | undefined) ?? '/chat/endpoint'
+const PRIMARY_AGENT_ID = 'smartq-invest'
+
+const AGENT_LIST: AgentProfile[] = [
+  {
+    id: 'smartq-invest',
+    name: '智投问答',
+    subtitle: 'SmartQ Invest',
+    description: '统一入口，解答市场判断、标的选择与风险分析。',
+    greeting: '你好，我是智投问答。你可以问我：市场阶段判断、个股风险、仓位建议。',
+    primary: true,
+  },
+  {
+    id: 'risk-radar',
+    name: '风控雷达',
+    subtitle: 'Risk Radar AI',
+    description: '多维扫描波动、回撤与不确定性，输出风险等级。',
+    greeting: '我是风控雷达。告诉我标的或组合，我会给出风险等级和关键预警。',
+  },
+  {
+    id: 'sector-navigator',
+    name: '方向导航',
+    subtitle: 'Sector Navigator',
+    description: '基于宏观与行业趋势筛选潜力投资方向。',
+    greeting: '我是方向导航。你可以让我筛选未来一段时间的高潜力赛道。',
+  },
+  {
+    id: 'market-insight',
+    name: '趋势洞察',
+    subtitle: 'Market Insight AI',
+    description: '判断市场上行、震荡或下行阶段与时机。',
+    greeting: '我是趋势洞察。你可以让我先做市场环境定性，再给策略建议。',
+  },
+  {
+    id: 'timing-hunter',
+    name: '时机捕手',
+    subtitle: 'Timing Hunter',
+    description: '识别入场、止盈与止损关键节点。',
+    greeting: '我是时机捕手。告诉我你的标的和周期，我会给买卖时机建议。',
+  },
+  {
+    id: 'portfolio-engine',
+    name: '资产配置引擎',
+    subtitle: 'Portfolio Engine',
+    description: '按风险偏好与资金规模生成配置方案。',
+    greeting: '我是资产配置引擎。提供你的风险偏好和资金规模，我给你配置建议。',
+  },
+  {
+    id: 'position-manager',
+    name: '持仓管家',
+    subtitle: 'Position Manager AI',
+    description: '分析持仓结构并提供调仓、加减仓建议。',
+    greeting: '我是持仓管家。把你的持仓发给我，我会给出优化与调仓建议。',
+  },
+  {
+    id: 'explainable-advisor',
+    name: '决策解读官',
+    subtitle: 'Explainable AI Advisor',
+    description: '将模型建议转为清晰可解释语言。',
+    greeting: '我是决策解读官。你可以把策略结果给我，我来解释逻辑与依据。',
+  },
+  {
+    id: 'scenario-simulator',
+    name: '投资沙盘',
+    subtitle: 'Scenario Simulator',
+    description: '模拟上涨、下跌、突发事件等情景下的收益风险。',
+    greeting: '我是投资沙盘。告诉我假设情景，我会模拟收益与风险变化。',
+  },
+  {
+    id: 'strategy-lab',
+    name: '策略工坊',
+    subtitle: 'Strategy Lab AI',
+    description: '按目标偏好生成长期或短期可执行策略。',
+    greeting: '我是策略工坊。你可以给我目标和期限，我帮你生成执行策略。',
+  },
+]
+const DEFAULT_AGENT = AGENT_LIST[0] as AgentProfile
 
 const addStockFormRef = ref<HTMLElement | null>(null)
 const watchlistViewRef = ref<HTMLElement | null>(null)
@@ -82,6 +168,8 @@ const isStockTransitioning = ref(false)
 
 const chats = ref<ChatSession[]>([])
 const activeChatId = ref<string | null>(null)
+const activeAgentId = ref(PRIMARY_AGENT_ID)
+const isAgentPickerExpanded = ref(false)
 const isChatSwitching = ref(false)
 const bubbleAnimationEnabled = ref(false)
 const isAiResponding = ref(false)
@@ -187,15 +275,27 @@ const summaryList = computed(() =>
 )
 
 const activeChat = computed(() => chats.value.find((chat) => chat.id === activeChatId.value) ?? null)
+const activeAgent = computed(
+  () => AGENT_LIST.find((agent) => agent.id === activeAgentId.value) ?? DEFAULT_AGENT,
+)
+const foldedAgents = computed(() => AGENT_LIST.filter((agent) => agent.id !== activeAgentId.value))
+const activeAgentChats = computed(() =>
+  chats.value.filter((chat) => chat.agentId === activeAgentId.value),
+)
 
 function createUid(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1e7)}`
 }
 
-function createDefaultAiMessage(): ChatMessage {
+function getAgentById(agentId: string): AgentProfile {
+  return AGENT_LIST.find((agent) => agent.id === agentId) ?? DEFAULT_AGENT
+}
+
+function createDefaultAiMessage(agentId: string): ChatMessage {
+  const agent = getAgentById(agentId)
   return {
     role: 'ai',
-    content: '你好，我是投资分析助手。你可以问我：个股风险、仓位建议、板块轮动判断等问题。',
+    content: agent.greeting,
   }
 }
 
@@ -436,24 +536,34 @@ function loadChats(): void {
 
     chats.value = parsed.map((chat) => ({
       id: chat.id || createUid('chat'),
+      agentId: chat.agentId || PRIMARY_AGENT_ID,
       title: chat.title || '新对话',
       createdAt: chat.createdAt || new Date().toLocaleString(),
       messages:
         Array.isArray(chat.messages) && chat.messages.length
           ? chat.messages
-          : [createDefaultAiMessage()],
+          : [createDefaultAiMessage(chat.agentId || PRIMARY_AGENT_ID)],
     }))
   } catch {
     chats.value = []
   }
 
+  const primaryAgentFirstChat = chats.value.find((chat) => chat.agentId === PRIMARY_AGENT_ID)
+  if (primaryAgentFirstChat) {
+    activeAgentId.value = PRIMARY_AGENT_ID
+    activeChatId.value = primaryAgentFirstChat.id
+    renderMessages(false)
+    return
+  }
+
   if (!chats.value.length) {
-    createNewChat(false)
+    createNewChat(false, PRIMARY_AGENT_ID)
     return
   }
 
   const firstChat = chats.value[0]
   if (!firstChat) return
+  activeAgentId.value = firstChat.agentId
   activeChatId.value = firstChat.id
   renderMessages(false)
 }
@@ -495,14 +605,17 @@ function transitionToChat(chatId: string, enterChatId: string | null = null, wit
   }, CHAT_SWITCH_MS)
 }
 
-function createNewChat(withAnim = true): void {
+function createNewChat(withAnim = true, targetAgentId = activeAgentId.value): void {
+  const agent = getAgentById(targetAgentId)
   const id = createUid('chat')
   chats.value.unshift({
     id,
-    title: '新对话',
+    agentId: targetAgentId,
+    title: `${agent.name}对话`,
     createdAt: new Date().toLocaleString(),
-    messages: [createDefaultAiMessage()],
+    messages: [createDefaultAiMessage(targetAgentId)],
   })
+  activeAgentId.value = targetAgentId
   persistChats()
 
   if (!activeChatId.value || !withAnim) {
@@ -520,7 +633,25 @@ function createNewChat(withAnim = true): void {
 
 function onNewChatClick(): void {
   if (isAiResponding.value) return
-  createNewChat(true)
+  createNewChat(true, activeAgentId.value)
+}
+
+function selectAgent(agentId: string): void {
+  if (isAiResponding.value) return
+  activeAgentId.value = agentId
+  isAgentPickerExpanded.value = false
+
+  const existingChat = chats.value.find((chat) => chat.agentId === agentId)
+  if (!existingChat) {
+    createNewChat(false, agentId)
+    return
+  }
+
+  transitionToChat(existingChat.id, null, true)
+}
+
+function toggleAgentPicker(): void {
+  isAgentPickerExpanded.value = !isAgentPickerExpanded.value
 }
 
 function switchChat(chatId: string): void {
@@ -543,10 +674,12 @@ function deleteChat(chatId: string): void {
   window.setTimeout(() => {
     chats.value = chats.value.filter((chat) => chat.id !== chatId)
 
+    const currentAgentChats = chats.value.filter((chat) => chat.agentId === activeAgentId.value)
+
     if (!chats.value.length) {
       activeChatId.value = null
       leavingChatId.value = null
-      createNewChat(false)
+      createNewChat(false, activeAgentId.value)
       panel?.classList.remove('chat-switch-out')
       panel?.classList.add('chat-switch-in')
       window.setTimeout(() => panel?.classList.remove('chat-switch-in'), CHAT_SWITCH_MS)
@@ -555,12 +688,17 @@ function deleteChat(chatId: string): void {
     }
 
     if (removingActive) {
-      const firstChat = chats.value[0]
-      if (firstChat) activeChatId.value = firstChat.id
-      renderMessages(true)
-      panel?.classList.remove('chat-switch-out')
-      panel?.classList.add('chat-switch-in')
-      window.setTimeout(() => panel?.classList.remove('chat-switch-in'), CHAT_SWITCH_MS)
+      const firstChat = currentAgentChats[0]
+      if (firstChat) {
+        activeChatId.value = firstChat.id
+        renderMessages(true)
+        panel?.classList.remove('chat-switch-out')
+        panel?.classList.add('chat-switch-in')
+        window.setTimeout(() => panel?.classList.remove('chat-switch-in'), CHAT_SWITCH_MS)
+      } else {
+        activeChatId.value = null
+        createNewChat(false, activeAgentId.value)
+      }
     }
 
     leavingChatId.value = null
@@ -664,7 +802,13 @@ function handleSseFrame(chatId: string, messageIndex: number, frame: SseFrame): 
   }
 }
 
-async function streamChatBySse(chatId: string, messageIndex: number, prompt: string): Promise<void> {
+async function streamChatBySse(
+  chatId: string,
+  messageIndex: number,
+  prompt: string,
+  agentId: string,
+): Promise<void> {
+  const agent = getAgentById(agentId)
   const controller = new AbortController()
   activeAiAbortController = controller
 
@@ -676,6 +820,8 @@ async function streamChatBySse(chatId: string, messageIndex: number, prompt: str
     },
     body: JSON.stringify({
       prompt,
+      agentId,
+      agentName: agent.name,
       stream: true,
       sse: true,
       thinking: useThinking.value,
@@ -729,6 +875,7 @@ async function sendMessage(): Promise<void> {
   if (!text || !activeChat.value) return
 
   const currentChatId = activeChat.value.id
+  const currentAgentId = activeChat.value.agentId
   const targetChat = getChatById(currentChatId)
   if (!targetChat) return
 
@@ -746,7 +893,7 @@ async function sendMessage(): Promise<void> {
   persistChats()
 
   try {
-    await streamChatBySse(currentChatId, aiMessageIndex, text)
+    await streamChatBySse(currentChatId, aiMessageIndex, text, currentAgentId)
 
     const chat = getChatById(currentChatId)
     const msg = chat?.messages[aiMessageIndex]
@@ -935,13 +1082,52 @@ onBeforeUnmount(() => {
 
         <div class="chat-main">
           <aside class="chat-history">
+            <div class="agent-picker">
+              <button
+                class="agent-focus"
+                :class="{ active: activeAgent?.primary }"
+                type="button"
+                :disabled="isAiResponding"
+                @click="selectAgent(activeAgentId)"
+              >
+                <span class="agent-focus-name">{{ activeAgent?.name }}</span>
+                <span class="agent-focus-subtitle">{{ activeAgent?.subtitle }}</span>
+                <span class="agent-focus-desc">{{ activeAgent?.description }}</span>
+              </button>
+              <button
+                class="btn agent-toggle-btn"
+                type="button"
+                :disabled="isAiResponding"
+                @click="toggleAgentPicker"
+              >
+                {{ isAgentPickerExpanded ? '收起智能体' : `展开其他智能体（${foldedAgents.length}）` }}
+              </button>
+              <div v-show="isAgentPickerExpanded" class="agent-fold-list">
+                <button
+                  v-for="agent in foldedAgents"
+                  :key="agent.id"
+                  class="agent-option"
+                  :class="{ active: agent.id === activeAgentId }"
+                  type="button"
+                  :disabled="isAiResponding"
+                  @click="selectAgent(agent.id)"
+                >
+                  <span class="agent-option-name">{{ agent.name }}</span>
+                  <span class="agent-option-subtitle">{{ agent.subtitle }}</span>
+                  <span class="agent-option-desc">{{ agent.description }}</span>
+                </button>
+              </div>
+            </div>
+
             <div class="history-head">
-              <strong style="font-size: 13px">历史对话</strong>
-              <button class="btn" id="newChatBtn" :disabled="isAiResponding" @click="onNewChatClick">新建</button>
+              <strong style="font-size: 13px">{{ activeAgent?.name }}会话</strong>
+              <button class="btn history-new-btn" id="newChatBtn" :disabled="isAiResponding" @click="onNewChatClick">
+                新建
+              </button>
             </div>
             <div class="history-list" id="historyList">
               <div
-                v-for="chat in chats"
+                v-for="chat in activeAgentChats"
                 :key="chat.id"
                 class="history-item"
                 :class="{
@@ -964,11 +1150,13 @@ onBeforeUnmount(() => {
                   删除
                 </button>
               </div>
+              <div v-if="!activeAgentChats.length" class="history-empty">当前智能体暂无会话，点击右上角新建开始对话。</div>
             </div>
           </aside>
 
           <div class="chat-body">
             <div class="chat-status">
+              <span class="agent-badge">当前智能体：{{ activeAgent?.name }}</span>
               <label class="thinking-toggle">
                 <input v-model="useThinking" type="checkbox" :disabled="isAiResponding" />
                 推理模式
@@ -994,7 +1182,7 @@ onBeforeUnmount(() => {
               <textarea
                 v-model="chatInput"
                 id="chatInput"
-                placeholder="请输入你的问题，例如：结合半导体板块资金流向，给出仓位建议"
+                :placeholder="`向${activeAgent?.name || '智能体'}提问，例如：结合半导体板块资金流向，给出仓位建议`"
                 :disabled="isAiResponding"
                 @keydown="onChatInputKeydown"
               ></textarea>
@@ -1009,7 +1197,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <div class="note">
-              说明：当前已接入 SSE 流式对话。可通过环境变量 VITE_AI_CHAT_ENDPOINT 配置后端地址，默认请求 /chat/endpoint。
+              说明：当前已接入 SSE 流式对话，并会携带智能体标识。可通过环境变量 VITE_AI_CHAT_ENDPOINT 配置后端地址，默认请求 /chat/endpoint。
             </div>
           </div>
         </div>
@@ -1020,16 +1208,27 @@ onBeforeUnmount(() => {
 
 <style>
 .app-page {
-  --bg: #f4f7fb;
-  --card: #ffffff;
+  --bg-start: #06b6d4;
+  --bg-end: #3b82f6;
+  --card: rgba(255, 255, 255, 0.58);
+  --surface: rgba(255, 255, 255, 0.52);
+  --surface-strong: rgba(255, 255, 255, 0.72);
+  --surface-soft: rgba(246, 251, 255, 0.5);
   --ink: #0d1b2a;
   --sub: #5b6b7a;
-  --line: #d7e1ea;
-  --accent: #1363df;
-  --accent-soft: #e8f0ff;
+  --line: rgba(137, 176, 233, 0.42);
+  --surface-stroke: rgba(133, 173, 233, 0.46);
+  --surface-bg: rgba(255, 255, 255, 0.56);
+  --accent: #0ea5e9;
+  --accent-deep: #3b82f6;
+  --accent-soft: rgba(59, 130, 246, 0.16);
   --up: #d64545;
   --down: #1f9d62;
-  --shadow: 0 10px 24px rgba(17, 34, 68, 0.08);
+  --shadow: 0 12px 26px rgba(9, 41, 93, 0.16);
+  --motion-fast: 0.18s;
+  --motion-normal: 0.24s;
+  --motion-slow: 0.32s;
+  --motion-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 * {
@@ -1039,14 +1238,21 @@ onBeforeUnmount(() => {
 }
 
 .app-page {
+  position: relative;
   font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at 10% 10%, #fef5dd 0, transparent 35%),
-    radial-gradient(circle at 90% 0%, #dce9ff 0, transparent 35%),
-    var(--bg);
+    linear-gradient(160deg, rgba(6, 182, 212, 0.96) 0%, rgba(25, 165, 222, 0.96) 38%, rgba(47, 141, 240, 0.95) 68%, rgba(59, 130, 246, 0.95) 100%);
   min-height: 100vh;
   padding: 16px;
+}
+
+.app-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 36%, rgba(255, 255, 255, 0) 100%);
 }
 
 .app {
@@ -1066,9 +1272,13 @@ onBeforeUnmount(() => {
 
 .panel {
   background: var(--card);
-  border: 1px solid var(--line);
+  border: 1px solid var(--surface-stroke);
   border-radius: 16px;
-  box-shadow: var(--shadow);
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px) saturate(132%);
+  -webkit-backdrop-filter: blur(14px) saturate(132%);
   overflow: hidden;
   min-height: 0;
   display: flex;
@@ -1076,13 +1286,26 @@ onBeforeUnmount(() => {
 }
 
 .panel-header {
+  position: relative;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(126, 166, 224, 0.3);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  background: rgba(255, 255, 255, 0.56);
+  backdrop-filter: blur(7px) saturate(120%);
+  -webkit-backdrop-filter: blur(7px) saturate(120%);
+}
+
+.panel-header::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(124, 165, 226, 0.6), transparent);
 }
 
 .panel-title {
@@ -1114,11 +1337,11 @@ onBeforeUnmount(() => {
     inset 0 1px 0 rgba(255, 255, 255, 0.62),
     0 8px 16px rgba(20, 40, 70, 0.11);
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    background 0.2s ease;
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    border-color var(--motion-normal) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    background var(--motion-normal) var(--motion-ease);
 }
 
 .btn:hover {
@@ -1155,16 +1378,16 @@ onBeforeUnmount(() => {
 }
 
 .btn.primary {
-  background: rgba(19, 99, 223, 0.72);
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.9), rgba(59, 130, 246, 0.92));
   color: #ffffff;
-  border-color: rgba(146, 188, 255, 0.88);
+  border-color: rgba(180, 221, 255, 0.9);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    0 10px 20px rgba(19, 99, 223, 0.35);
+    0 10px 20px rgba(23, 119, 225, 0.38);
 }
 
 .btn.primary:hover {
-  background: rgba(19, 99, 223, 0.8);
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.96), rgba(59, 130, 246, 0.98));
   border-color: rgba(177, 210, 255, 0.92);
   color: #ffffff;
   filter: none;
@@ -1178,7 +1401,7 @@ onBeforeUnmount(() => {
 }
 
 .btn.primary.active {
-  background: rgba(19, 99, 223, 0.98);
+  background: linear-gradient(135deg, rgba(6, 182, 212, 1), rgba(59, 130, 246, 1));
   border-color: rgba(177, 210, 255, 0.99);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
@@ -1187,7 +1410,7 @@ onBeforeUnmount(() => {
 }
 
 .btn.primary.active:hover {
-  background: rgba(19, 99, 223, 0.99);
+  background: linear-gradient(135deg, rgba(6, 182, 212, 1), rgba(59, 130, 246, 1));
   border-color: rgba(200, 230, 255, 0.99);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.48),
@@ -1216,6 +1439,34 @@ onBeforeUnmount(() => {
     0 12px 20px rgba(19, 99, 223, 0.16);
 }
 
+#addStockBtn {
+  min-width: 74px;
+  color: #ffffff;
+  border: 1px solid rgba(176, 219, 255, 0.9);
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.94), rgba(59, 130, 246, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 10px 20px rgba(23, 119, 225, 0.36);
+}
+
+#addStockBtn:hover {
+  color: #ffffff;
+  border-color: rgba(196, 229, 255, 0.96);
+  background: linear-gradient(135deg, rgba(6, 182, 212, 1), rgba(59, 130, 246, 1));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 12px 22px rgba(23, 119, 225, 0.42);
+}
+
+#addStockBtn:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+#addStockBtn:not(.active) {
+  filter: saturate(88%);
+  opacity: 0.88;
+}
+
 .watchlist-wrap {
   display: flex;
   flex-direction: column;
@@ -1224,24 +1475,43 @@ onBeforeUnmount(() => {
 }
 
 .add-stock {
+  margin: 0;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
+  border: 0;
+  border-bottom: 1px solid rgba(126, 166, 224, 0.28);
+  border-radius: 0;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
+  background: var(--surface-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
 .add-stock input {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 9px 11px;
+  border: 1px solid rgba(146, 183, 236, 0.5);
+  border-radius: 14px;
+  padding: 10px 14px;
   outline: none;
   font-size: 13px;
+  color: #173354;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 248, 255, 0.88));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 6px 12px rgba(25, 75, 146, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.add-stock input::placeholder {
+  color: rgba(46, 75, 112, 0.62);
 }
 
 .add-stock input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: rgba(59, 130, 246, 0.72);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 249, 255, 0.94));
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 8px 16px rgba(31, 93, 180, 0.14);
 }
 
 .watchlist-view,
@@ -1251,6 +1521,10 @@ onBeforeUnmount(() => {
 }
 
 .watchlist-view {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
   overflow-y: auto;
 }
 
@@ -1263,7 +1537,11 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(8px) saturate(140%);
   -webkit-backdrop-filter: blur(8px) saturate(140%);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    border-color var(--motion-normal) var(--motion-ease),
+    background var(--motion-normal) var(--motion-ease);
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
@@ -1291,7 +1569,10 @@ onBeforeUnmount(() => {
   opacity: 0;
   visibility: hidden;
   transform: translateX(6px) scale(0.97);
-  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+  transition:
+    opacity var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    visibility var(--motion-fast) var(--motion-ease);
   pointer-events: none;
 }
 
@@ -1334,6 +1615,10 @@ onBeforeUnmount(() => {
 
 .stock-detail-view {
   display: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
   padding: 16px;
   overflow-y: auto;
 }
@@ -1422,7 +1707,11 @@ onBeforeUnmount(() => {
 }
 
 .sector-body {
+  margin: 0;
   padding: 14px;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
   overflow-y: auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1432,10 +1721,17 @@ onBeforeUnmount(() => {
 
 .chart-card,
 .insight-card {
-  border: 1px solid var(--line);
+  border: 1px solid #d4e4fb;
   border-radius: 12px;
   padding: 12px;
-  background: #fcfdff;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 8px 15px rgba(25, 58, 115, 0.08);
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    border-color var(--motion-normal) var(--motion-ease);
 }
 
 .card-title {
@@ -1451,10 +1747,10 @@ onBeforeUnmount(() => {
 }
 
 .pie-box {
-  border: 1px solid var(--line);
+  border: 1px solid #d7e5f9;
   border-radius: 10px;
   padding: 10px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .pie-title {
@@ -1475,13 +1771,13 @@ onBeforeUnmount(() => {
 }
 
 .insight-item {
-  border: 1px dashed #cdd9e6;
+  border: 1px dashed #bfd1ea;
   border-radius: 10px;
   padding: 9px 10px;
   font-size: 13px;
   color: #334155;
   line-height: 1.5;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .summary-list {
@@ -1495,8 +1791,8 @@ onBeforeUnmount(() => {
   color: #334155;
   padding: 8px 9px;
   border-radius: 8px;
-  background: #fff;
-  border: 1px dashed #cfd9e6;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px dashed #c5d6ee;
 }
 
 .chat-panel {
@@ -1505,50 +1801,271 @@ onBeforeUnmount(() => {
 
 .chat-main {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 320px 1fr;
+  position: relative;
+  margin: 0;
+  padding: 10px 0 10px 10px;
+  gap: 10px;
+  border: 0;
+  border-radius: 0;
+  background:
+    var(--surface);
   min-height: 0;
   flex: 1;
 }
 
+.chat-main::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(125, 170, 232, 0.66), transparent);
+}
+
 .chat-history {
-  border-right: 1px solid var(--line);
-  background: #f8fbff;
+  border: 1px solid var(--surface-stroke);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.66);
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.history-head {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.history-list {
+  position: relative;
   overflow-y: auto;
-  padding: 8px;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #b8ccea transparent;
+}
+
+.chat-history::before,
+.chat-history::after {
+  content: '';
+  position: sticky;
+  left: 0;
+  right: 0;
+  height: 16px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.chat-history::before {
+  top: 0;
+  background: linear-gradient(180deg, rgba(246, 250, 255, 0.96), rgba(246, 250, 255, 0));
+}
+
+.chat-history::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(243, 248, 255, 0.96), rgba(243, 248, 255, 0));
+}
+
+.chat-history::-webkit-scrollbar {
+  width: 9px;
+}
+
+.chat-history::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-history::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #c5d8f5, #9fbde8);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.chat-history::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #afcaef, #84aee3);
+  background-clip: content-box;
+}
+
+.agent-picker {
+  padding: 10px;
+  border-bottom: 1px solid rgba(126, 166, 224, 0.28);
+  background: rgba(255, 255, 255, 0.56);
   display: grid;
   gap: 8px;
 }
 
-.history-item {
-  border: 1px solid rgba(255, 255, 255, 0.45);
+.agent-focus {
+  border: 1px solid rgba(134, 178, 240, 0.68);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(235, 246, 255, 0.88));
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    border-color var(--motion-normal) var(--motion-ease),
+    background var(--motion-normal) var(--motion-ease);
+}
+
+.agent-focus:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(34, 80, 160, 0.16);
+}
+
+.agent-focus.active {
+  border-color: #8db8ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 10px 22px rgba(34, 80, 160, 0.16);
+}
+
+.agent-focus-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1f2a44;
+}
+
+.agent-focus-subtitle {
+  font-size: 11px;
+  color: #4b6485;
+}
+
+.agent-focus-desc {
+  font-size: 11px;
+  color: #365273;
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+.agent-toggle-btn {
+  width: 100%;
+}
+
+.agent-fold-list {
+  display: grid;
+  gap: 7px;
+}
+
+.agent-option {
+  border: 1px solid #d7e5fa;
   border-radius: 10px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 8px 9px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    border-color var(--motion-normal) var(--motion-ease),
+    background var(--motion-normal) var(--motion-ease);
+  display: grid;
+  gap: 1px;
+}
+
+.agent-option:hover,
+.agent-option.active {
+  border-color: #78afea;
+  background: linear-gradient(135deg, rgba(237, 247, 255, 0.98), rgba(220, 238, 255, 0.92));
+}
+
+.agent-option-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2a44;
+}
+
+.agent-option-subtitle {
+  font-size: 11px;
+  color: #5c708d;
+}
+
+.agent-option-desc {
+  font-size: 11px;
+  color: #60738e;
+  line-height: 1.4;
+}
+
+.history-head {
+  margin: 8px 10px;
+  padding: 10px 12px;
+  border: 1px solid #c9ddff;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(238, 247, 255, 0.9));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 8px 18px rgba(35, 77, 145, 0.1);
+}
+
+.history-new-btn {
+  border: 1px solid rgba(255, 255, 255, 0.58);
   background: rgba(255, 255, 255, 0.32);
-  backdrop-filter: blur(8px) saturate(140%);
-  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(155%);
+  -webkit-backdrop-filter: blur(12px) saturate(155%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 10px 18px rgba(20, 40, 70, 0.12);
+  min-width: 68px;
+}
+
+.history-new-btn:hover {
+  background: rgba(255, 255, 255, 0.42);
+  border-color: rgba(19, 99, 223, 0.56);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 12px 20px rgba(19, 99, 223, 0.16);
+}
+
+.history-new-btn:active {
+  transform: translateY(1px) scale(0.97);
+  box-shadow:
+    inset 0 2px 6px rgba(13, 27, 42, 0.12),
+    0 4px 10px rgba(13, 27, 42, 0.1);
+}
+
+.history-list {
+  flex: none;
+  overflow: visible;
+  margin: 0 10px 10px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  min-height: auto;
+  padding-bottom: 16px;
+  border: 1px solid var(--surface-stroke);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(8px) saturate(138%);
+  -webkit-backdrop-filter: blur(8px) saturate(138%);
+}
+
+.history-empty {
+  font-size: 12px;
+  color: var(--sub);
+  border: 1px dashed #c8d9f3;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fbff;
+}
+
+.history-item {
+  border: 1px solid #d3e2fa;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(237, 245, 255, 0.82));
+  backdrop-filter: blur(8px) saturate(145%);
+  -webkit-backdrop-filter: blur(8px) saturate(145%);
   padding: 9px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    border-color var(--motion-normal) var(--motion-ease),
+    background var(--motion-normal) var(--motion-ease);
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: center;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    0 5px 10px rgba(20, 40, 70, 0.07);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 7px 14px rgba(20, 40, 70, 0.09);
 }
 
 .history-meta {
@@ -1557,13 +2074,14 @@ onBeforeUnmount(() => {
 
 .history-item.active,
 .history-item:hover {
-  border-color: rgba(19, 99, 223, 0.52);
-  background: rgba(19, 99, 223, 0.14);
-  backdrop-filter: blur(8px) saturate(145%);
-  -webkit-backdrop-filter: blur(8px) saturate(145%);
+  border-color: rgba(90, 149, 242, 0.75);
+  background: linear-gradient(135deg, rgba(226, 238, 255, 0.96), rgba(205, 225, 255, 0.88));
+  backdrop-filter: blur(9px) saturate(150%);
+  -webkit-backdrop-filter: blur(9px) saturate(150%);
+  transform: translateY(-1px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    0 6px 12px rgba(19, 99, 223, 0.12);
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 10px 18px rgba(49, 106, 194, 0.2);
 }
 
 .history-title {
@@ -1581,21 +2099,35 @@ onBeforeUnmount(() => {
 }
 
 .chat-body {
+  border: 1px solid var(--surface-stroke);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.68);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
 .chat-status {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(126, 166, 224, 0.28);
   padding: 8px 12px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   gap: 8px;
   font-size: 12px;
   color: var(--sub);
-  background: #fbfdff;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.agent-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #edf4ff;
+  color: #284a79;
+  border: 1px solid #c8ddff;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .thinking-toggle {
@@ -1612,6 +2144,7 @@ onBeforeUnmount(() => {
 }
 
 .status-text {
+  margin-left: auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1685,19 +2218,33 @@ onBeforeUnmount(() => {
 
 .chat-input-wrap textarea {
   resize: none;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 9px 11px;
+  border: 1px solid rgba(146, 183, 236, 0.5);
+  border-radius: 14px;
+  padding: 10px 14px;
   min-height: 46px;
   max-height: 110px;
   outline: none;
   font-size: 13px;
   font-family: inherit;
+  color: #173354;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 248, 255, 0.88));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 6px 12px rgba(25, 75, 146, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.chat-input-wrap textarea::placeholder {
+  color: rgba(46, 75, 112, 0.62);
 }
 
 .chat-input-wrap textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: rgba(59, 130, 246, 0.72);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 249, 255, 0.94));
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 8px 16px rgba(31, 93, 180, 0.14);
 }
 
 .note {
@@ -1830,7 +2377,7 @@ onBeforeUnmount(() => {
   .chat-history {
     border-right: 0;
     border-bottom: 1px solid var(--line);
-    max-height: 170px;
+    max-height: 320px;
   }
 }
 
