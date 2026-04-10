@@ -1,28 +1,18 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { AGENT_LIST, DEFAULT_AGENT, PRIMARY_AGENT_ID, getAgentPrompt, type AgentProfile } from './agents'
+import EChartsPie from './components/EChartsPie.vue'
+import { fetchSectorOverview, type SectorOverviewPayload } from './services/sectors'
+import { addWatchlistStock, fetchStockDetail, type StockApiPayload } from './services/stocks'
 
-type Stock = {
+type Stock = StockApiPayload & {
   id: string
-  name: string
-  code: string
-  price: number
-  change: number
-  turnover: string
-  pe: string
-  pb: string
-  marketCap: string
-  volumeRatio: string
-  mainFlow: string
-  sentiment: string
-  tags: string[]
+  isLoading: boolean
+  detailLoading: boolean
 }
 
-type SectorData = {
-  labels: string[]
-  flow: number[]
-  heat: number[]
-  sentiment: number[]
-  insights: string[]
+type PersistedStock = StockApiPayload & {
+  id?: string
 }
 
 type ChatMessage = {
@@ -43,119 +33,24 @@ type ChatSession = {
   messages: ChatMessage[]
 }
 
-type AgentProfile = {
-  id: string
-  name: string
-  subtitle: string
-  description: string
-  greeting: string
-  primary?: boolean
-}
-
-type ChartInstance = {
-  destroy: () => void
-}
-
-type ChartCtor = new (
-  item: HTMLCanvasElement,
-  config: {
-    type: string
-    data: Record<string, unknown>
-    options: Record<string, unknown>
-  },
-) => ChartInstance
-
 const STOCK_TRANSITION_MS = 240
 const LIST_ITEM_ANIM_MS = 220
 const CHAT_SWITCH_MS = 220
 const STORAGE_KEY = 'ai_invest_chat_history'
+const WATCHLIST_STORAGE_KEY = 'ai_invest_watchlist'
 const AI_CHAT_ENDPOINT = (import.meta.env.VITE_AI_CHAT_ENDPOINT as string | undefined) ?? '/chat/endpoint'
-const PRIMARY_AGENT_ID = 'smartq-invest'
-
-const AGENT_LIST: AgentProfile[] = [
-  {
-    id: 'smartq-invest',
-    name: '智投问答',
-    subtitle: 'SmartQ Invest',
-    description: '统一入口，解答市场判断、标的选择与风险分析。',
-    greeting: '你好，我是智投问答。你可以问我：市场阶段判断、个股风险、仓位建议。',
-    primary: true,
-  },
-  {
-    id: 'risk-radar',
-    name: '风控雷达',
-    subtitle: 'Risk Radar AI',
-    description: '多维扫描波动、回撤与不确定性，输出风险等级。',
-    greeting: '我是风控雷达。告诉我标的或组合，我会给出风险等级和关键预警。',
-  },
-  {
-    id: 'sector-navigator',
-    name: '方向导航',
-    subtitle: 'Sector Navigator',
-    description: '基于宏观与行业趋势筛选潜力投资方向。',
-    greeting: '我是方向导航。你可以让我筛选未来一段时间的高潜力赛道。',
-  },
-  {
-    id: 'market-insight',
-    name: '趋势洞察',
-    subtitle: 'Market Insight AI',
-    description: '判断市场上行、震荡或下行阶段与时机。',
-    greeting: '我是趋势洞察。你可以让我先做市场环境定性，再给策略建议。',
-  },
-  {
-    id: 'timing-hunter',
-    name: '时机捕手',
-    subtitle: 'Timing Hunter',
-    description: '识别入场、止盈与止损关键节点。',
-    greeting: '我是时机捕手。告诉我你的标的和周期，我会给买卖时机建议。',
-  },
-  {
-    id: 'portfolio-engine',
-    name: '资产配置引擎',
-    subtitle: 'Portfolio Engine',
-    description: '按风险偏好与资金规模生成配置方案。',
-    greeting: '我是资产配置引擎。提供你的风险偏好和资金规模，我给你配置建议。',
-  },
-  {
-    id: 'position-manager',
-    name: '持仓管家',
-    subtitle: 'Position Manager AI',
-    description: '分析持仓结构并提供调仓、加减仓建议。',
-    greeting: '我是持仓管家。把你的持仓发给我，我会给出优化与调仓建议。',
-  },
-  {
-    id: 'explainable-advisor',
-    name: '决策解读官',
-    subtitle: 'Explainable AI Advisor',
-    description: '将模型建议转为清晰可解释语言。',
-    greeting: '我是决策解读官。你可以把策略结果给我，我来解释逻辑与依据。',
-  },
-  {
-    id: 'scenario-simulator',
-    name: '投资沙盘',
-    subtitle: 'Scenario Simulator',
-    description: '模拟上涨、下跌、突发事件等情景下的收益风险。',
-    greeting: '我是投资沙盘。告诉我假设情景，我会模拟收益与风险变化。',
-  },
-  {
-    id: 'strategy-lab',
-    name: '策略工坊',
-    subtitle: 'Strategy Lab AI',
-    description: '按目标偏好生成长期或短期可执行策略。',
-    greeting: '我是策略工坊。你可以给我目标和期限，我帮你生成执行策略。',
-  },
-]
-const DEFAULT_AGENT = AGENT_LIST[0] as AgentProfile
 
 const addStockFormRef = ref<HTMLElement | null>(null)
 const watchlistViewRef = ref<HTMLElement | null>(null)
 const stockDetailViewRef = ref<HTMLElement | null>(null)
 const messagesPanelRef = ref<HTMLElement | null>(null)
-const flowCanvasRef = ref<HTMLCanvasElement | null>(null)
-const sentimentCanvasRef = ref<HTMLCanvasElement | null>(null)
 
 const stockInput = ref('')
 const chatInput = ref('')
+const isAddingStock = ref(false)
+const isWatchlistRefreshing = ref(false)
+const stockActionHint = ref('')
+const isSectorLoading = ref(false)
 
 const enteringStockId = ref<string | null>(null)
 const leavingStockId = ref<string | null>(null)
@@ -176,81 +71,34 @@ const isAiResponding = ref(false)
 const useThinking = ref(true)
 const streamHint = ref('')
 
-let flowChart: ChartInstance | null = null
-let sentimentChart: ChartInstance | null = null
-let chartLoadPromise: Promise<void> | null = null
 let activeAiAbortController: AbortController | null = null
 
 const watchlist = ref<Stock[]>([
-  {
-    id: '',
-    name: '贵州茅台',
-    code: '600519',
-    price: 1765.52,
-    change: 1.68,
-    turnover: '2.83%',
-    pe: '29.4',
-    pb: '9.1',
-    marketCap: '2.22万亿',
-    volumeRatio: '1.08',
-    mainFlow: '+3.5亿',
-    sentiment: '偏强',
-    tags: ['白酒龙头', '北向关注', '高ROE'],
-  },
-  {
-    id: '',
-    name: '宁德时代',
-    code: '300750',
-    price: 204.33,
-    change: -0.92,
-    turnover: '3.52%',
-    pe: '22.1',
-    pb: '4.8',
-    marketCap: '0.90万亿',
-    volumeRatio: '0.93',
-    mainFlow: '-1.2亿',
-    sentiment: '震荡',
-    tags: ['储能', '新能源车', '机构重仓'],
-  },
-  {
-    id: '',
-    name: '中际旭创',
-    code: '300308',
-    price: 147.09,
-    change: 3.22,
-    turnover: '9.37%',
-    pe: '35.7',
-    pb: '7.3',
-    marketCap: '0.12万亿',
-    volumeRatio: '1.35',
-    mainFlow: '+4.1亿',
-    sentiment: '强势',
-    tags: ['CPO', '算力', '高弹性'],
-  },
+  createEmptyStock('贵州茅台', '600519'),
+  createEmptyStock('宁德时代', '300750'),
+  createEmptyStock('中际旭创', '300308'),
 ])
-
-const sectorTemplate: SectorData = {
-  labels: ['半导体', 'AI算力', '创新药', '低空经济', '券商', '机器人'],
-  flow: [28, 21, -6, 15, -3, 12],
-  heat: [86, 80, 48, 72, 43, 67],
-  sentiment: [78, 74, 61, 66, 58, 63],
-  insights: [
-    '主线资金继续围绕科技成长，AI算力和半导体获得持续增量资金。',
-    '情绪指标位于中高位，短线分歧加大，追高需控制仓位。',
-    '政策风向偏向科技自主可控与新质生产力，产业链龙头受益更明确。',
-    '顺周期板块资金承接偏弱，建议观察成交量能否持续修复。',
-  ],
-}
-
-const sectorData = ref<SectorData>(cloneSectorData(sectorTemplate))
-
-watchlist.value.forEach((stock) => {
-  stock.id = createUid('stock')
-})
+const sectorData = ref<SectorOverviewPayload>(createEmptySectorOverview())
 
 const selectedStock = computed(() =>
   watchlist.value.find((stock) => stock.id === selectedStockId.value),
 )
+
+const detailTags = computed(() => {
+  const stock = selectedStock.value
+  if (!stock) return [] as string[]
+  if (stock.tags.length) return stock.tags
+  if (stock.detailLoading) return ['分析中']
+  return [] as string[]
+})
+
+const selectedStockStatusNote = computed(() => {
+  const stock = selectedStock.value
+  if (!stock) return ''
+  if (stock.detailLoading) return '正在同步今日投资数据并生成分析标签...'
+  if (stock.isLoading) return '正在刷新自选股卡片数据...'
+  return stock.statusNote ?? ''
+})
 
 const detailKpis = computed(() => {
   const stock = selectedStock.value
@@ -267,12 +115,37 @@ const detailKpis = computed(() => {
   ]
 })
 
-const summaryList = computed(() =>
-  sectorData.value.labels.map((name, index) => ({
-    name,
-    heat: sectorData.value.heat[index],
+const flowChartItems = computed(() =>
+  sectorData.value.sectors.map((item) => ({
+    name: item.name,
+    value: item.attentionScore,
   })),
 )
+
+const sentimentChartItems = computed(() =>
+  sectorData.value.sectors.map((item) => ({
+    name: item.name,
+    value: item.sentimentScore,
+  })),
+)
+
+const summaryList = computed(() =>
+  sectorData.value.sectors.map((item) => ({
+    name: item.name,
+    heat: item.strengthScore,
+    reason: item.reason,
+  })),
+)
+
+const sectorStatusNote = computed(() => {
+  if (isSectorLoading.value) return '正在同步今日投资 MCP 市场数据并生成板块分析...'
+  return [sectorData.value.statusNote, sectorData.value.sourceNote].filter(Boolean).join('；')
+})
+
+const watchlistRefreshButtonText = computed(() => {
+  if (isWatchlistRefreshing.value) return '刷新中...'
+  return isDetailVisible.value ? '刷新详情' : '刷新自选'
+})
 
 const activeChat = computed(() => chats.value.find((chat) => chat.id === activeChatId.value) ?? null)
 const activeAgent = computed(
@@ -287,6 +160,78 @@ function createUid(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1e7)}`
 }
 
+function createEmptyStock(name: string, code: string): Stock {
+  return {
+    id: createUid('stock'),
+    name,
+    code,
+    price: null,
+    change: null,
+    turnover: '--',
+    pe: '--',
+    pb: '--',
+    marketCap: '--',
+    volumeRatio: '--',
+    mainFlow: '--',
+    sentiment: '--',
+    tags: [],
+    statusNote: '',
+    detailLoaded: false,
+    isLoading: false,
+    detailLoading: false,
+  }
+}
+
+function applyStockPayload(target: Stock, payload: StockApiPayload): void {
+  target.name = payload.name
+  target.code = payload.code
+  target.price = payload.price ?? null
+  target.change = payload.change ?? null
+  target.turnover = payload.turnover || '--'
+  target.pe = payload.pe || '--'
+  target.pb = payload.pb || '--'
+  target.marketCap = payload.marketCap || '--'
+  target.volumeRatio = payload.volumeRatio || '--'
+  target.mainFlow = payload.mainFlow || '--'
+  target.sentiment = payload.sentiment || '--'
+  target.tags = Array.isArray(payload.tags) ? [...payload.tags] : []
+  target.statusNote = payload.statusNote ?? ''
+  target.detailLoaded = Boolean(payload.detailLoaded)
+}
+
+function createStockFromPayload(payload: StockApiPayload): Stock {
+  const stock = createEmptyStock(payload.name, payload.code)
+  applyStockPayload(stock, payload)
+  return stock
+}
+
+function toPersistedStock(stock: Stock): PersistedStock {
+  return {
+    id: stock.id,
+    name: stock.name,
+    code: stock.code,
+    price: stock.price,
+    change: stock.change,
+    turnover: stock.turnover,
+    pe: stock.pe,
+    pb: stock.pb,
+    marketCap: stock.marketCap,
+    volumeRatio: stock.volumeRatio,
+    mainFlow: stock.mainFlow,
+    sentiment: stock.sentiment,
+    tags: [...stock.tags],
+    statusNote: stock.statusNote ?? '',
+    detailLoaded: Boolean(stock.detailLoaded),
+  }
+}
+
+function restorePersistedStock(payload: PersistedStock): Stock {
+  const stock = createEmptyStock(payload.name || '未命名股票', payload.code || '------')
+  stock.id = payload.id || stock.id
+  applyStockPayload(stock, payload)
+  return stock
+}
+
 function getAgentById(agentId: string): AgentProfile {
   return AGENT_LIST.find((agent) => agent.id === agentId) ?? DEFAULT_AGENT
 }
@@ -299,22 +244,86 @@ function createDefaultAiMessage(agentId: string): ChatMessage {
   }
 }
 
-function cloneSectorData(data: SectorData): SectorData {
-  return JSON.parse(JSON.stringify(data)) as SectorData
+function createEmptySectorOverview(): SectorOverviewPayload {
+  return {
+    sectors: [],
+    insights: [],
+    statusNote: '',
+    sourceNote: '',
+    detailLoaded: false,
+  }
 }
 
-function changeClass(value: number): 'up' | 'down' {
+function changeClass(value: number | null | undefined): 'up' | 'down' | 'flat' {
+  if (typeof value !== 'number') return 'flat'
   return value >= 0 ? 'up' : 'down'
 }
 
-function formatChange(value: number): string {
+function formatChange(value: number | null | undefined): string {
+  if (typeof value !== 'number') return '--'
   const sign = value >= 0 ? '+' : ''
   return `${sign}${value.toFixed(2)}%`
+}
+
+function formatPrice(value: number | null | undefined): string {
+  return typeof value === 'number' ? `${value.toFixed(2)} 元` : '--'
 }
 
 function clearStockAnimClass(el: HTMLElement | null): void {
   if (!el) return
   el.classList.remove('view-enter-from-right', 'view-enter-from-left', 'view-exit-to-left', 'view-exit-to-right')
+}
+
+async function refreshStockSummary(target: Stock, query = target.code): Promise<void> {
+  target.isLoading = true
+  try {
+    const payload = await addWatchlistStock(query)
+    applyStockPayload(target, payload)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '股票卡片刷新失败'
+    target.statusNote = message
+  } finally {
+    target.isLoading = false
+  }
+}
+
+async function refreshWatchlistData(): Promise<void> {
+  if (isWatchlistRefreshing.value) return
+
+  const currentStock = selectedStock.value
+  if (isDetailVisible.value && !currentStock) return
+  if (!isDetailVisible.value && !watchlist.value.length) {
+    stockActionHint.value = '当前没有可刷新的自选股。'
+    return
+  }
+
+  isWatchlistRefreshing.value = true
+  try {
+    if (isDetailVisible.value && currentStock) {
+      await loadStockDetail(currentStock)
+      return
+    }
+
+    await Promise.allSettled(watchlist.value.map((stock) => refreshStockSummary(stock)))
+    stockActionHint.value = '自选股卡片已手动刷新。'
+  } finally {
+    isWatchlistRefreshing.value = false
+  }
+}
+
+async function loadStockDetail(target: Stock): Promise<void> {
+  if (target.detailLoading) return
+
+  target.detailLoading = true
+  try {
+    const payload = await fetchStockDetail(target.code)
+    applyStockPayload(target, payload)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '股票详情加载失败'
+    target.statusNote = message
+  } finally {
+    target.detailLoading = false
+  }
 }
 
 function showStockDetailById(stockId: string): void {
@@ -323,6 +332,7 @@ function showStockDetailById(stockId: string): void {
   if (!stock) return
 
   selectedStockId.value = stock.id
+  void loadStockDetail(stock)
   isStockTransitioning.value = true
 
   const addFormEl = addStockFormRef.value
@@ -382,36 +392,45 @@ function backToWatchlist(): void {
   }, STOCK_TRANSITION_MS)
 }
 
-function addStock(): void {
+async function addStock(): Promise<void> {
   const value = stockInput.value.trim()
-  if (!value) return
+  if (!value || isAddingStock.value) return
 
-  const isCode = /^\d{6}$/.test(value)
-  const randomChange = (Math.random() * 8 - 4).toFixed(2)
-  const sentimentPool = ['偏强', '中性', '震荡', '转弱']
-  const randomSentiment = sentimentPool[Math.floor(Math.random() * sentimentPool.length)] ?? '中性'
-  const newStock: Stock = {
-    id: createUid('stock'),
-    name: isCode ? `股票${value}` : value,
-    code: isCode ? value : String(Math.floor(100000 + Math.random() * 900000)),
-    price: Number((Math.random() * 150 + 10).toFixed(2)),
-    change: Number(randomChange),
-    turnover: `${(Math.random() * 8 + 1).toFixed(2)}%`,
-    pe: (Math.random() * 60 + 10).toFixed(1),
-    pb: (Math.random() * 10 + 1).toFixed(1),
-    marketCap: `${(Math.random() * 1.2 + 0.05).toFixed(2)}万亿`,
-    volumeRatio: (Math.random() * 2 + 0.5).toFixed(2),
-    mainFlow: `${Math.random() > 0.5 ? '+' : '-'}${(Math.random() * 5).toFixed(1)}亿`,
-    sentiment: randomSentiment,
-    tags: ['新添加', '待跟踪'],
+  isAddingStock.value = true
+  stockActionHint.value = '正在识别股票并同步自选股卡片...'
+
+  try {
+    const payload = await addWatchlistStock(value)
+    const existingIndex = watchlist.value.findIndex((stock) => stock.code === payload.code)
+
+    if (existingIndex >= 0) {
+      const existing = watchlist.value[existingIndex]
+      if (!existing) return
+      watchlist.value.splice(existingIndex, 1)
+      applyStockPayload(existing, payload)
+      watchlist.value.unshift(existing)
+      enteringStockId.value = existing.id
+      stockActionHint.value = payload.statusNote
+        ? `${payload.name} 已在自选中，已刷新。${payload.statusNote}`
+        : `${payload.name} 已在自选中，卡片已刷新。`
+    } else {
+      const newStock = createStockFromPayload(payload)
+      watchlist.value.unshift(newStock)
+      enteringStockId.value = newStock.id
+      stockActionHint.value = payload.statusNote
+        ? `${payload.name} 已加入自选。${payload.statusNote}`
+        : `${payload.name} 已加入自选。`
+    }
+
+    stockInput.value = ''
+    window.setTimeout(() => {
+      if (enteringStockId.value) enteringStockId.value = null
+    }, 320)
+  } catch (error) {
+    stockActionHint.value = error instanceof Error ? error.message : '股票添加失败'
+  } finally {
+    isAddingStock.value = false
   }
-
-  watchlist.value.unshift(newStock)
-  stockInput.value = ''
-  enteringStockId.value = newStock.id
-  window.setTimeout(() => {
-    if (enteringStockId.value === newStock.id) enteringStockId.value = null
-  }, 320)
 }
 
 function onStockInputKeydown(event: KeyboardEvent): void {
@@ -432,101 +451,45 @@ function deleteStock(stockId: string): void {
   }, LIST_ITEM_ANIM_MS)
 }
 
-function getChartCtor(): ChartCtor | null {
-  const maybeChart = (window as unknown as { Chart?: ChartCtor }).Chart
-  return maybeChart ?? null
+function currentSectorProbeCodes(): string[] {
+  return watchlist.value.map((stock) => stock.code).filter((code) => /^\d{6}$/.test(code))
 }
 
-function ensureChartJsLoaded(): Promise<void> {
-  if (getChartCtor()) return Promise.resolve()
-  if (chartLoadPromise) return chartLoadPromise
+async function refreshSectorData(): Promise<void> {
+  if (isSectorLoading.value) return
 
-  chartLoadPromise = new Promise((resolve, reject) => {
-    const existing = document.getElementById('chartjs-cdn-script') as HTMLScriptElement | null
-    if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true })
-      existing.addEventListener('error', () => reject(new Error('加载 Chart.js 失败')), { once: true })
-      return
+  isSectorLoading.value = true
+  try {
+    const payload = await fetchSectorOverview(currentSectorProbeCodes())
+    sectorData.value = payload
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '板块分析刷新失败'
+    sectorData.value = {
+      ...sectorData.value,
+      statusNote: message,
     }
-
-    const script = document.createElement('script')
-    script.id = 'chartjs-cdn-script'
-    script.src = 'https://cdn.jsdelivr.net/npm/chart.js'
-    script.async = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('加载 Chart.js 失败'))
-    document.head.appendChild(script)
-  })
-
-  return chartLoadPromise
+  } finally {
+    isSectorLoading.value = false
+  }
 }
 
-function renderSectorCharts(): void {
-  const Chart = getChartCtor()
-  if (!Chart || !flowCanvasRef.value || !sentimentCanvasRef.value) return
+function loadWatchlist(): void {
+  try {
+    const saved = localStorage.getItem(WATCHLIST_STORAGE_KEY)
+    if (saved === null) return
 
-  flowChart?.destroy()
-  sentimentChart?.destroy()
+    const parsed = JSON.parse(saved) as PersistedStock[]
+    if (!Array.isArray(parsed)) return
 
-  flowChart = new Chart(flowCanvasRef.value, {
-    type: 'doughnut',
-    data: {
-      labels: sectorData.value.labels,
-      datasets: [
-        {
-          label: '资金关注度',
-          data: sectorData.value.flow.map((n) => Math.abs(n)),
-          backgroundColor: ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#14b8a6'],
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '52%',
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { boxWidth: 10, font: { size: 11 } },
-        },
-      },
-    },
-  })
-
-  sentimentChart = new Chart(sentimentCanvasRef.value, {
-    type: 'pie',
-    data: {
-      labels: sectorData.value.labels,
-      datasets: [
-        {
-          label: '市场情绪',
-          data: sectorData.value.sentiment,
-          backgroundColor: ['#0ea5e9', '#22c55e', '#f97316', '#eab308', '#a855f7', '#f43f5e'],
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { boxWidth: 10, font: { size: 11 } },
-        },
-      },
-    },
-  })
+    watchlist.value = parsed.map((stock) => restorePersistedStock(stock))
+  } catch {
+    localStorage.removeItem(WATCHLIST_STORAGE_KEY)
+  }
 }
 
-function refreshSectorData(): void {
-  const data = cloneSectorData(sectorTemplate)
-  data.flow = data.flow.map((n) => Number((n + (Math.random() * 12 - 6)).toFixed(1)))
-  data.heat = data.heat.map((n) => Math.max(15, Math.min(98, Math.round(n + (Math.random() * 16 - 8)))))
-  data.sentiment = data.sentiment.map((n) => Math.max(20, Math.min(95, Math.round(n + (Math.random() * 12 - 6)))))
-  sectorData.value = data
-  renderSectorCharts()
+function persistWatchlist(): void {
+  const payload = watchlist.value.map((stock) => toPersistedStock(stock))
+  localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(payload))
 }
 
 function loadChats(): void {
@@ -809,6 +772,7 @@ async function streamChatBySse(
   agentId: string,
 ): Promise<void> {
   const agent = getAgentById(agentId)
+  const fullPrompt = getAgentPrompt(agent, prompt)
   const controller = new AbortController()
   activeAiAbortController = controller
 
@@ -819,9 +783,11 @@ async function streamChatBySse(
       Accept: 'text/event-stream',
     },
     body: JSON.stringify({
-      prompt,
+      prompt: fullPrompt,
       agentId,
       agentName: agent.name,
+      systemPrompt: agent.systemPrompt,
+      originalPrompt: prompt,
       stream: true,
       sse: true,
       thinking: useThinking.value,
@@ -921,20 +887,21 @@ function onChatInputKeydown(event: KeyboardEvent): void {
   }
 }
 
+watch(
+  watchlist,
+  () => {
+    persistWatchlist()
+  },
+  { deep: true },
+)
+
 onMounted(async () => {
+  loadWatchlist()
   loadChats()
-  try {
-    await ensureChartJsLoaded()
-    renderSectorCharts()
-  } catch {
-    // Chart.js 加载失败时忽略，页面其它功能仍可用。
-  }
 })
 
 onBeforeUnmount(() => {
   activeAiAbortController?.abort()
-  flowChart?.destroy()
-  sentimentChart?.destroy()
 })
 </script>
 
@@ -948,6 +915,14 @@ onBeforeUnmount(() => {
               <div class="panel-title">自选股区</div>
               <div class="panel-subtitle">添加/选择股票，查看该股参数与分析标签</div>
             </div>
+            <button
+              class="btn"
+              id="refreshWatchlistBtn"
+              :disabled="isWatchlistRefreshing || isAddingStock"
+              @click="refreshWatchlistData"
+            >
+              {{ watchlistRefreshButtonText }}
+            </button>
           </div>
 
           <div
@@ -967,10 +942,12 @@ onBeforeUnmount(() => {
               class="btn primary"
               :class="{ active: !!stockInput.trim() }"
               id="addStockBtn"
+              :disabled="isAddingStock"
               @click="addStock"
             >
-              添加
+              {{ isAddingStock ? '识别中...' : '添加' }}
             </button>
+            <div v-if="stockActionHint" class="stock-action-hint">{{ stockActionHint }}</div>
           </div>
 
           <div v-show="!isDetailVisible" ref="watchlistViewRef" class="watchlist-view" id="watchlistView">
@@ -992,7 +969,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="stock-item-actions">
                 <div class="stock-change" :class="changeClass(stock.change)">
-                  {{ formatChange(stock.change) }}
+                  {{ stock.isLoading && stock.change === null ? '同步中' : formatChange(stock.change) }}
                 </div>
                 <button class="btn primary row-action-btn" type="button" @click.stop="deleteStock(stock.id)">
                   删除
@@ -1015,14 +992,13 @@ onBeforeUnmount(() => {
               </div>
               <button class="btn" id="backToWatchlistBtn" @click="backToWatchlist">返回自选列表</button>
             </div>
-            <div class="detail-price" id="detailPrice">
-              {{ selectedStock ? `${selectedStock.price.toFixed(2)} 元` : '--' }}
-            </div>
-            <div class="stock-change" :class="changeClass(selectedStock?.change ?? 0)" id="detailChange">
+            <div class="detail-price" id="detailPrice">{{ formatPrice(selectedStock?.price) }}</div>
+            <div class="stock-change" :class="changeClass(selectedStock?.change)" id="detailChange">
               {{ selectedStock ? formatChange(selectedStock.change) : '--' }}
             </div>
+            <div v-if="selectedStockStatusNote" class="stock-status-note">{{ selectedStockStatusNote }}</div>
             <div class="detail-tags" id="detailTags">
-              <span v-for="tag in selectedStock?.tags ?? []" :key="tag" class="tag">{{ tag }}</span>
+              <span v-for="tag in detailTags" :key="tag" class="tag">{{ tag }}</span>
             </div>
             <div class="detail-grid" id="detailGrid">
               <div v-for="item in detailKpis" :key="item.label" class="kpi">
@@ -1039,26 +1015,48 @@ onBeforeUnmount(() => {
               <div class="panel-title">板块分析区</div>
               <div class="panel-subtitle">概念板块/行业板块资金流向、情绪热度、政策风向</div>
             </div>
-            <button class="btn" id="refreshSectorBtn" @click="refreshSectorData">刷新数据</button>
+            <button class="btn" id="refreshSectorBtn" :disabled="isSectorLoading" @click="refreshSectorData">
+              {{ isSectorLoading ? '分析中...' : '刷新数据' }}
+            </button>
           </div>
 
           <div class="sector-body">
             <div class="chart-card">
               <div class="card-title">板块图表分析（直观饼图）</div>
+              <div v-if="sectorStatusNote" class="sector-status-note">{{ sectorStatusNote }}</div>
               <div class="pie-grid">
                 <div class="pie-box">
                   <div class="pie-title">资金关注度占比</div>
-                  <div class="pie-wrap"><canvas ref="flowCanvasRef" id="flowChart"></canvas></div>
+                  <div class="pie-wrap">
+                    <EChartsPie
+                      id="flowChart"
+                      :items="flowChartItems"
+                      mode="donut"
+                      series-name="资金关注度"
+                      :loading="isSectorLoading"
+                      empty-text="暂无资金关注度数据"
+                    />
+                  </div>
                 </div>
                 <div class="pie-box">
                   <div class="pie-title">市场情绪占比</div>
-                  <div class="pie-wrap"><canvas ref="sentimentCanvasRef" id="sentimentChart"></canvas></div>
+                  <div class="pie-wrap">
+                    <EChartsPie
+                      id="sentimentChart"
+                      :items="sentimentChartItems"
+                      mode="pie"
+                      series-name="市场情绪"
+                      :loading="isSectorLoading"
+                      empty-text="暂无市场情绪数据"
+                    />
+                  </div>
                 </div>
               </div>
               <div class="summary-list" id="summaryList">
                 <div v-for="item in summaryList" :key="item.name" class="summary-item">
                   {{ item.name }}：强弱评分 {{ item.heat }}
                 </div>
+                <div v-if="!summaryList.length && !isSectorLoading" class="summary-item">等待今日投资 MCP 返回真实板块数据。</div>
               </div>
             </div>
 
@@ -1066,6 +1064,7 @@ onBeforeUnmount(() => {
               <div class="card-title">市场情绪与政策风向解读</div>
               <div class="insight-list" id="insightList">
                 <div v-for="line in sectorData.insights" :key="line" class="insight-item">{{ line }}</div>
+                <div v-if="!sectorData.insights.length && !isSectorLoading" class="insight-item">等待模型基于 MCP 数据生成解读。</div>
               </div>
             </div>
           </div>
@@ -1418,6 +1417,7 @@ onBeforeUnmount(() => {
 }
 
 #backToWatchlistBtn,
+#refreshWatchlistBtn,
 #refreshSectorBtn,
 #newChatBtn {
   background: rgba(255, 255, 255, 0.32);
@@ -1430,6 +1430,7 @@ onBeforeUnmount(() => {
 }
 
 #backToWatchlistBtn:hover,
+#refreshWatchlistBtn:hover,
 #refreshSectorBtn:hover,
 #newChatBtn:hover {
   background: rgba(255, 255, 255, 0.42);
@@ -1485,6 +1486,13 @@ onBeforeUnmount(() => {
   gap: 8px;
   background: var(--surface-soft);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.stock-action-hint {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: rgba(36, 73, 120, 0.82);
+  line-height: 1.5;
 }
 
 .add-stock input {
@@ -1613,6 +1621,12 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 
+.stock-change.flat {
+  color: rgba(48, 75, 108, 0.72);
+  font-weight: 700;
+  font-size: 13px;
+}
+
 .stock-detail-view {
   display: none;
   margin: 0;
@@ -1672,6 +1686,13 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 8px;
   margin: 10px 0 14px;
+}
+
+.stock-status-note {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(44, 72, 104, 0.8);
 }
 
 .tag {
@@ -1738,6 +1759,17 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 700;
   margin-bottom: 8px;
+}
+
+.sector-status-note {
+  margin-bottom: 10px;
+  padding: 9px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(44, 72, 104, 0.82);
+  border: 1px dashed #bfd1ea;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .pie-grid {

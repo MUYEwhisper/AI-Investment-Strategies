@@ -1,0 +1,17 @@
+.venv
+.idea
+.vscode
+.DS_Store
+.env
+*.whl
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+test.py
+
+utils/models/cache
+cache/stock_service/
+cache/sector_service/
