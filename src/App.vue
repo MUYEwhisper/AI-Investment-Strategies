@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { AGENT_LIST, DEFAULT_AGENT, PRIMARY_AGENT_ID, getAgentPrompt, type AgentProfile } from './agents'
 import EChartsPie from './components/EChartsPie.vue'
+import StrategyWorkbenchPage from './components/StrategyWorkbenchPage.vue'
 import { fetchSectorOverview, type SectorOverviewPayload } from './services/sectors'
 import { addWatchlistStock, fetchStockDetail, type StockApiPayload } from './services/stocks'
 
@@ -39,6 +41,7 @@ const CHAT_SWITCH_MS = 220
 const STORAGE_KEY = 'ai_invest_chat_history'
 const WATCHLIST_STORAGE_KEY = 'ai_invest_watchlist'
 const AI_CHAT_ENDPOINT = (import.meta.env.VITE_AI_CHAT_ENDPOINT as string | undefined) ?? '/chat/endpoint'
+const route = useRoute()
 
 const addStockFormRef = ref<HTMLElement | null>(null)
 const watchlistViewRef = ref<HTMLElement | null>(null)
@@ -64,12 +67,13 @@ const isStockTransitioning = ref(false)
 const chats = ref<ChatSession[]>([])
 const activeChatId = ref<string | null>(null)
 const activeAgentId = ref(PRIMARY_AGENT_ID)
-const isAgentPickerExpanded = ref(false)
+const isAgentPickerExpanded = ref(true)
 const isChatSwitching = ref(false)
 const bubbleAnimationEnabled = ref(false)
 const isAiResponding = ref(false)
 const useThinking = ref(true)
 const streamHint = ref('')
+const shouldStickToLatestMessage = ref(true)
 
 let activeAiAbortController: AbortController | null = null
 
@@ -79,6 +83,13 @@ const watchlist = ref<Stock[]>([
   createEmptyStock('中际旭创', '300308'),
 ])
 const sectorData = ref<SectorOverviewPayload>(createEmptySectorOverview())
+const isStrategyRoute = computed(() => route.name === 'strategy-workbench')
+const pageTitle = computed(() => (isStrategyRoute.value ? '策略工作台' : '市场总览'))
+const pageDescription = computed(() =>
+  isStrategyRoute.value
+    ? '独立承接策略分析、组合体检、模拟交易和异动解释，避免和首页信息区互相挤压。'
+    : '首页聚焦自选股、板块热度与 AI 对话，作为日常观察和交互入口。',
+)
 
 const selectedStock = computed(() =>
   watchlist.value.find((stock) => stock.id === selectedStockId.value),
@@ -535,13 +546,25 @@ function persistChats(): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(chats.value))
 }
 
-function renderMessages(withBubbleAnim = false): void {
-  bubbleAnimationEnabled.value = withBubbleAnim
+function scrollMessagesToBottom(force = false): void {
   nextTick(() => {
     const panel = messagesPanelRef.value
     if (!panel) return
+    if (!force && !shouldStickToLatestMessage.value) return
     panel.scrollTop = panel.scrollHeight
   })
+}
+
+function renderMessages(withBubbleAnim = false, forceScroll = false): void {
+  bubbleAnimationEnabled.value = withBubbleAnim
+  scrollMessagesToBottom(forceScroll)
+}
+
+function handleMessagesScroll(): void {
+  const panel = messagesPanelRef.value
+  if (!panel) return
+  const distanceToBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight
+  shouldStickToLatestMessage.value = distanceToBottom <= 24
 }
 
 function transitionToChat(chatId: string, enterChatId: string | null = null, withBubbleAnim = true): void {
@@ -555,7 +578,8 @@ function transitionToChat(chatId: string, enterChatId: string | null = null, wit
   window.setTimeout(() => {
     activeChatId.value = chatId
     enteringChatId.value = enterChatId
-    renderMessages(withBubbleAnim)
+    shouldStickToLatestMessage.value = true
+    renderMessages(withBubbleAnim, true)
 
     panel?.classList.remove('chat-switch-out')
     panel?.classList.add('chat-switch-in')
@@ -584,7 +608,8 @@ function createNewChat(withAnim = true, targetAgentId = activeAgentId.value): vo
   if (!activeChatId.value || !withAnim) {
     activeChatId.value = id
     enteringChatId.value = id
-    renderMessages(withAnim)
+    shouldStickToLatestMessage.value = true
+    renderMessages(withAnim, true)
     window.setTimeout(() => {
       if (enteringChatId.value === id) enteringChatId.value = null
     }, 320)
@@ -745,7 +770,7 @@ function handleSseFrame(chatId: string, messageIndex: number, frame: SseFrame): 
     return
   }
 
-  if (frame.event === 'message') {
+    if (frame.event === 'message') {
     const content = typeof payload?.content === 'string' ? payload.content : frame.data
     appendAiMessage(chatId, messageIndex, content)
     renderMessages(false)
@@ -855,7 +880,8 @@ async function sendMessage(): Promise<void> {
   chatInput.value = ''
   isAiResponding.value = true
   streamHint.value = '正在连接 AI 服务...'
-  renderMessages(false)
+  shouldStickToLatestMessage.value = true
+  renderMessages(false, true)
   persistChats()
 
   try {
@@ -908,7 +934,31 @@ onBeforeUnmount(() => {
 <template>
   <div class="app-page">
     <div class="app">
-      <section class="top-grid">
+      <header class="page-header">
+        <div class="page-copy">
+          <div class="page-kicker">AI Investment Console</div>
+          <div class="page-title">{{ pageTitle }}</div>
+          <div class="page-subtitle">{{ pageDescription }}</div>
+        </div>
+        <nav class="page-switcher" aria-label="页面导航">
+          <RouterLink class="page-switch" :class="{ active: !isStrategyRoute }" to="/" id="pageNavDashboard">
+            市场总览
+          </RouterLink>
+          <RouterLink
+            class="page-switch"
+            :class="{ active: isStrategyRoute }"
+            to="/strategy"
+            id="pageNavStrategy"
+          >
+            策略工作台
+          </RouterLink>
+        </nav>
+      </header>
+
+      <Transition name="page-shell" mode="out-in">
+        <div :key="isStrategyRoute ? 'strategy' : 'dashboard'" class="page-stage">
+          <template v-if="!isStrategyRoute">
+            <section class="top-grid">
         <article class="panel watchlist-wrap" id="watchlistPanel">
           <div class="panel-header">
             <div>
@@ -1009,7 +1059,7 @@ onBeforeUnmount(() => {
           </div>
         </article>
 
-        <article class="panel">
+        <article class="panel sector-panel">
           <div class="panel-header">
             <div>
               <div class="panel-title">板块分析区</div>
@@ -1080,76 +1130,86 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="chat-main">
-          <aside class="chat-history">
-            <div class="agent-picker">
-              <button
-                class="agent-focus"
-                :class="{ active: activeAgent?.primary }"
-                type="button"
-                :disabled="isAiResponding"
-                @click="selectAgent(activeAgentId)"
-              >
-                <span class="agent-focus-name">{{ activeAgent?.name }}</span>
-                <span class="agent-focus-subtitle">{{ activeAgent?.subtitle }}</span>
-                <span class="agent-focus-desc">{{ activeAgent?.description }}</span>
-              </button>
-              <button
-                class="btn agent-toggle-btn"
-                type="button"
-                :disabled="isAiResponding"
-                @click="toggleAgentPicker"
-              >
-                {{ isAgentPickerExpanded ? '收起智能体' : `展开其他智能体（${foldedAgents.length}）` }}
-              </button>
-              <div v-show="isAgentPickerExpanded" class="agent-fold-list">
+          <aside class="chat-sidebar">
+            <div class="chat-sidebar-section agent-section">
+              <div class="agent-picker">
                 <button
-                  v-for="agent in foldedAgents"
-                  :key="agent.id"
-                  class="agent-option"
-                  :class="{ active: agent.id === activeAgentId }"
+                  class="agent-focus"
+                  :class="{ active: activeAgent?.primary }"
                   type="button"
                   :disabled="isAiResponding"
-                  @click="selectAgent(agent.id)"
+                  @click="selectAgent(activeAgentId)"
                 >
-                  <span class="agent-option-name">{{ agent.name }}</span>
-                  <span class="agent-option-subtitle">{{ agent.subtitle }}</span>
-                  <span class="agent-option-desc">{{ agent.description }}</span>
+                  <span class="agent-focus-name">{{ activeAgent?.name }}</span>
+                  <span class="agent-focus-subtitle">{{ activeAgent?.subtitle }}</span>
+                  <span class="agent-focus-desc">{{ activeAgent?.description }}</span>
                 </button>
+                <button
+                  class="btn agent-toggle-btn"
+                  type="button"
+                  :disabled="isAiResponding"
+                  @click="toggleAgentPicker"
+                >
+                  {{ isAgentPickerExpanded ? '收起智能体' : `展开其他智能体（${foldedAgents.length}）` }}
+                </button>
+                <div v-show="isAgentPickerExpanded" class="agent-fold-list">
+                  <button
+                    v-for="agent in foldedAgents"
+                    :key="agent.id"
+                    class="agent-option"
+                    :class="{ active: agent.id === activeAgentId }"
+                    type="button"
+                    :disabled="isAiResponding"
+                    @click="selectAgent(agent.id)"
+                  >
+                    <span class="agent-option-name">{{ agent.name }}</span>
+                    <span class="agent-option-subtitle">{{ agent.subtitle }}</span>
+                    <span class="agent-option-desc">{{ agent.description }}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div class="history-head">
-              <strong style="font-size: 13px">{{ activeAgent?.name }}会话</strong>
-              <button class="btn history-new-btn" id="newChatBtn" :disabled="isAiResponding" @click="onNewChatClick">
-                新建
-              </button>
-            </div>
-            <div class="history-list" id="historyList">
-              <div
-                v-for="chat in activeAgentChats"
-                :key="chat.id"
-                class="history-item"
-                :class="{
-                  active: chat.id === activeChatId,
-                  'list-item-enter': chat.id === enteringChatId,
-                  'list-item-leave': chat.id === leavingChatId,
-                }"
-                @click="switchChat(chat.id)"
-              >
-                <div class="history-meta">
-                  <div class="history-title">{{ chat.title }}</div>
-                  <div class="history-time">{{ chat.createdAt }}</div>
-                </div>
+            <div class="chat-sidebar-section history-section">
+              <div class="history-head">
+                <strong style="font-size: 13px">{{ activeAgent?.name }}会话</strong>
                 <button
-                  class="btn primary row-action-btn"
-                  type="button"
+                  class="btn history-new-btn"
+                  id="newChatBtn"
                   :disabled="isAiResponding"
-                  @click.stop="deleteChat(chat.id)"
+                  @click="onNewChatClick"
                 >
-                  删除
+                  新建
                 </button>
               </div>
-              <div v-if="!activeAgentChats.length" class="history-empty">当前智能体暂无会话，点击右上角新建开始对话。</div>
+
+              <div class="history-list" id="historyList">
+                <div
+                  v-for="chat in activeAgentChats"
+                  :key="chat.id"
+                  class="history-item"
+                  :class="{
+                    active: chat.id === activeChatId,
+                    'list-item-enter': chat.id === enteringChatId,
+                    'list-item-leave': chat.id === leavingChatId,
+                  }"
+                  @click="switchChat(chat.id)"
+                >
+                  <div class="history-meta">
+                    <div class="history-title">{{ chat.title }}</div>
+                    <div class="history-time">{{ chat.createdAt }}</div>
+                  </div>
+                  <button
+                    class="btn primary row-action-btn"
+                    type="button"
+                    :disabled="isAiResponding"
+                    @click.stop="deleteChat(chat.id)"
+                  >
+                    删除
+                  </button>
+                </div>
+                <div v-if="!activeAgentChats.length" class="history-empty">当前智能体暂无会话，点击右上角新建开始对话。</div>
+              </div>
             </div>
           </aside>
 
@@ -1162,7 +1222,7 @@ onBeforeUnmount(() => {
               </label>
               <span class="status-text">{{ streamHint || (isAiResponding ? '正在生成回复...' : '就绪') }}</span>
             </div>
-            <div ref="messagesPanelRef" class="messages" id="messages">
+            <div ref="messagesPanelRef" class="messages" id="messages" @scroll="handleMessagesScroll">
               <div
                 v-for="(msg, idx) in activeChat?.messages ?? []"
                 :key="`${activeChat?.id ?? 'chat'}_${idx}`"
@@ -1200,7 +1260,16 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
-      </section>
+            </section>
+          </template>
+
+          <StrategyWorkbenchPage
+            v-else
+            :watchlist="watchlist"
+            :selected-stock="selectedStock ?? null"
+          />
+        </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -1256,17 +1325,115 @@ onBeforeUnmount(() => {
 
 .app {
   display: grid;
-  grid-template-rows: minmax(420px, 58vh) minmax(320px, 42vh);
+  grid-auto-rows: auto;
   gap: 14px;
-  max-width: 1600px;
+  max-width: 1800px;
   margin: 0 auto;
+}
+
+.page-stage {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 30%),
+    linear-gradient(135deg, rgba(13, 27, 42, 0.2), rgba(59, 130, 246, 0.12), rgba(255, 255, 255, 0.12));
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(14px) saturate(132%);
+  -webkit-backdrop-filter: blur(14px) saturate(132%);
+}
+
+.page-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.page-kicker {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(232, 243, 255, 0.78);
+}
+
+.page-title {
+  font-size: clamp(26px, 3.5vw, 38px);
+  font-weight: 800;
+  line-height: 1.04;
+  color: #ffffff;
+}
+
+.page-subtitle {
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: rgba(236, 246, 255, 0.9);
+}
+
+.page-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.page-switch {
+  min-width: 116px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  color: rgba(238, 247, 255, 0.86);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    background var(--motion-normal) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.page-switch:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.page-switch.active {
+  background: rgba(255, 255, 255, 0.94);
+  color: #0f3e74;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.76),
+    0 10px 18px rgba(9, 41, 93, 0.16);
+  animation: pageSwitchActivate 0.34s var(--motion-ease);
 }
 
 .top-grid {
   display: grid;
-  grid-template-columns: 32% 68%;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 1.98fr);
   gap: 14px;
   min-height: 0;
+  height: clamp(480px, 54vh, 585px);
+  align-items: stretch;
+}
+
+.top-grid > .panel {
+  height: 100%;
 }
 
 .panel {
@@ -1471,6 +1638,11 @@ onBeforeUnmount(() => {
 .watchlist-wrap {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.sector-panel {
   min-height: 0;
   height: 100%;
 }
@@ -1738,6 +1910,8 @@ onBeforeUnmount(() => {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   min-height: 0;
+  flex: 1;
+  align-items: start;
 }
 
 .chart-card,
@@ -1753,6 +1927,10 @@ onBeforeUnmount(() => {
     transform var(--motion-fast) var(--motion-ease),
     box-shadow var(--motion-normal) var(--motion-ease),
     border-color var(--motion-normal) var(--motion-ease);
+  min-height: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
 }
 
 .card-title {
@@ -1800,6 +1978,9 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 8px;
   margin-top: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .insight-item {
@@ -1829,11 +2010,12 @@ onBeforeUnmount(() => {
 
 .chat-panel {
   min-height: 0;
+  height: clamp(560px, 58vh, 820px);
 }
 
 .chat-main {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 360px minmax(0, 1fr);
   position: relative;
   margin: 0;
   padding: 10px 0 10px 10px;
@@ -1844,6 +2026,7 @@ onBeforeUnmount(() => {
     var(--surface);
   min-height: 0;
   flex: 1;
+  height: 100%;
 }
 
 .chat-main::before {
@@ -1856,7 +2039,7 @@ onBeforeUnmount(() => {
   background: linear-gradient(90deg, transparent, rgba(125, 170, 232, 0.66), transparent);
 }
 
-.chat-history {
+.chat-sidebar {
   border: 1px solid var(--surface-stroke);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.66);
@@ -1864,56 +2047,58 @@ onBeforeUnmount(() => {
   flex-direction: column;
   min-height: 0;
   position: relative;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
+}
+
+.chat-sidebar-section,
+.history-list,
+.messages {
   scrollbar-width: thin;
   scrollbar-color: #b8ccea transparent;
 }
 
-.chat-history::before,
-.chat-history::after {
-  content: '';
-  position: sticky;
-  left: 0;
-  right: 0;
-  height: 16px;
-  z-index: 4;
-  pointer-events: none;
-}
-
-.chat-history::before {
-  top: 0;
-  background: linear-gradient(180deg, rgba(246, 250, 255, 0.96), rgba(246, 250, 255, 0));
-}
-
-.chat-history::after {
-  bottom: 0;
-  background: linear-gradient(0deg, rgba(243, 248, 255, 0.96), rgba(243, 248, 255, 0));
-}
-
-.chat-history::-webkit-scrollbar {
+.chat-sidebar-section::-webkit-scrollbar,
+.history-list::-webkit-scrollbar,
+.messages::-webkit-scrollbar {
   width: 9px;
 }
 
-.chat-history::-webkit-scrollbar-track {
+.chat-sidebar-section::-webkit-scrollbar-track,
+.history-list::-webkit-scrollbar-track,
+.messages::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.chat-history::-webkit-scrollbar-thumb {
+.chat-sidebar-section::-webkit-scrollbar-thumb,
+.history-list::-webkit-scrollbar-thumb,
+.messages::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #c5d8f5, #9fbde8);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
-.chat-history::-webkit-scrollbar-thumb:hover {
+.chat-sidebar-section::-webkit-scrollbar-thumb:hover,
+.history-list::-webkit-scrollbar-thumb:hover,
+.messages::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #afcaef, #84aee3);
   background-clip: content-box;
 }
 
+.chat-sidebar-section {
+  min-height: 0;
+}
+
+.agent-section {
+  flex: 0 1 auto;
+  max-height: 300px;
+  min-height: 0;
+  overflow-y: auto;
+  border-bottom: 1px solid rgba(126, 166, 224, 0.2);
+}
+
 .agent-picker {
   padding: 10px;
-  border-bottom: 1px solid rgba(126, 166, 224, 0.28);
   background: rgba(255, 255, 255, 0.56);
   display: grid;
   gap: 8px;
@@ -2014,7 +2199,7 @@ onBeforeUnmount(() => {
 }
 
 .history-head {
-  margin: 8px 10px;
+  margin: 8px 10px 0;
   padding: 10px 12px;
   border: 1px solid #c9ddff;
   border-radius: 12px;
@@ -2053,14 +2238,22 @@ onBeforeUnmount(() => {
     0 4px 10px rgba(13, 27, 42, 0.1);
 }
 
+.history-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .history-list {
-  flex: none;
-  overflow: visible;
+  flex: 1;
+  overflow-y: auto;
   margin: 0 10px 10px;
   padding: 10px;
   display: grid;
   gap: 8px;
-  min-height: auto;
+  min-height: 0;
   padding-bottom: 16px;
   border: 1px solid var(--surface-stroke);
   border-radius: 12px;
@@ -2138,6 +2331,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
 }
 
 .chat-status {
@@ -2204,7 +2398,7 @@ onBeforeUnmount(() => {
 }
 
 .msg {
-  max-width: min(80%, 820px);
+  max-width: min(92%, 1180px);
   border-radius: 12px;
   padding: 9px 11px;
   line-height: 1.6;
@@ -2393,9 +2587,67 @@ onBeforeUnmount(() => {
   }
 }
 
+@keyframes pageSwitchActivate {
+  0% {
+    transform: scale(0.96);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.76),
+      0 0 0 rgba(9, 41, 93, 0);
+  }
+
+  60% {
+    transform: scale(1.02);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.78),
+      0 14px 24px rgba(9, 41, 93, 0.2);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.76),
+      0 10px 18px rgba(9, 41, 93, 0.16);
+  }
+}
+
+.page-shell-enter-active,
+.page-shell-leave-active {
+  transition:
+    opacity 0.28s var(--motion-ease),
+    transform 0.28s var(--motion-ease),
+    filter 0.28s var(--motion-ease);
+}
+
+.page-shell-enter-from {
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  filter: blur(8px);
+}
+
+.page-shell-leave-to {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.99);
+  filter: blur(6px);
+}
+
 @media (max-width: 1100px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-switcher {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .page-switch {
+    flex: 1;
+  }
+
   .top-grid {
     grid-template-columns: 1fr;
+    height: auto;
   }
 
   .sector-body {
@@ -2406,10 +2658,19 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .chat-history {
-    border-right: 0;
+  .chat-panel {
+    height: auto;
+    min-height: 700px;
+  }
+
+  .chat-sidebar {
     border-bottom: 1px solid var(--line);
-    max-height: 320px;
+    height: 320px;
+  }
+
+  .agent-section {
+    max-height: 180px;
+    min-height: 0;
   }
 }
 
@@ -2420,6 +2681,15 @@ onBeforeUnmount(() => {
 
   .app {
     grid-template-rows: auto auto;
+  }
+
+  .page-header {
+    padding: 16px;
+  }
+
+  .page-switcher {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .detail-grid {
