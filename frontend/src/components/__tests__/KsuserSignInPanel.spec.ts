@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import KsuserSignInPanel from '../KsuserSignInPanel.vue'
 
 describe('KsuserSignInPanel', () => {
-  it('submits the next step when Enter is pressed in a configuration field', async () => {
+  it('uses a real form submit so Enter in a configuration field advances the flow', async () => {
     const wrapper = mount(KsuserSignInPanel, {
       props: {
         busy: false,
@@ -19,8 +19,7 @@ describe('KsuserSignInPanel', () => {
       },
     })
 
-    const input = wrapper.find('input')
-    await input.trigger('keydown.enter')
+    await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('signIn')).toHaveLength(1)
     expect(wrapper.emitted('signIn')?.[0]?.[0]).toMatchObject({

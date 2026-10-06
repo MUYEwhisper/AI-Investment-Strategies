@@ -62,7 +62,7 @@ function submit(): void {
 </script>
 
 <template>
-  <section class="signin-shell" id="signInPanel" @keydown.enter.prevent="submit">
+  <section class="signin-shell" id="signInPanel">
     <article class="signin-rail">
       <div class="signin-brand-pill">
         <span class="signin-brand-mark">K</span>
