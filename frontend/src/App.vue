@@ -1161,10 +1161,12 @@ async function handleKsuserCallback(): Promise<void> {
   callbackMessage.value = '正在校验授权结果并同步账号信息，请稍候。'
 
   try {
-    const returnTo = await authStore.finishSignIn(new URLSearchParams(window.location.search))
+    await authStore.finishSignIn(new URLSearchParams(window.location.search))
     callbackStatus.value = 'success'
-    callbackMessage.value = '登录成功，正在返回工作区...'
-    await router.replace(returnTo)
+    callbackMessage.value = '登录成功，正在返回市场总览...'
+    // The first successful OAuth login always lands on the stable dashboard.
+    // This also prevents a stale redirect query from sending users back to Ksuser.
+    await router.replace('/')
   } catch (error) {
     callbackStatus.value = 'error'
     callbackMessage.value = error instanceof Error ? error.message : 'Ksuser 登录失败，请稍后重试。'
@@ -1331,6 +1333,15 @@ onBeforeUnmount(() => {
           <div class="page-subtitle">{{ pageDescription }}</div>
         </div>
         <div class="header-actions">
+          <a
+            class="desktop-client-link"
+            href="https://github.com/MUYEwhisper/AI-Investment-Strategies/releases/latest"
+            target="_blank"
+            rel="noreferrer"
+            id="desktopClientDownloadLink"
+          >
+            下载桌面客户端
+          </a>
           <nav class="page-switcher" aria-label="页面导航">
             <RouterLink class="page-switch" :class="{ active: isDashboardRoute }" to="/" id="pageNavDashboard">
               市场总览
@@ -1863,6 +1874,32 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.desktop-client-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(247, 251, 255, 0.94);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform var(--motion-fast) var(--motion-ease), background var(--motion-normal) var(--motion-ease);
+}
+
+.desktop-client-link:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.desktop-client-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(165, 205, 255, 0.38);
 }
 
 .page-copy {

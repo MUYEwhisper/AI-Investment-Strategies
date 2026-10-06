@@ -1,7 +1,7 @@
 {
   "name": "ai-investment-strategies",
   "productName": "智能投资平台",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "智能投资平台 Windows 桌面客户端与前后端源码",
   "author": "MUYEwhisper",
   "private": true,
@@ -23,15 +23,37 @@
     "electron": "44.5.1",
     "electron-builder": "26.15.3"
   },
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "build": {
     "appId": "cn.muyewhisper.investment",
     "productName": "智能投资平台",
     "artifactName": "AI-Investment-Strategies-Setup-${version}-${arch}.${ext}",
-    "directories": { "output": "release", "buildResources": "desktop/assets" },
-    "files": ["desktop/main.cjs", "desktop/navigation.cjs", "desktop/window-state.cjs", "desktop/offline.html", "desktop/assets/icon.ico", "package.json"],
+    "directories": {
+      "output": "release",
+      "buildResources": "desktop/assets"
+    },
+    "files": [
+      "desktop/main.cjs",
+      "desktop/navigation.cjs",
+      "desktop/window-state.cjs",
+      "desktop/offline.html",
+      "desktop/assets/icon.ico",
+      "package.json"
+    ],
     "asar": true,
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "desktop/assets/icon.ico" },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "desktop/assets/icon.ico"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -40,7 +62,10 @@
       "createStartMenuShortcut": true,
       "shortcutName": "智能投资平台",
       "deleteAppDataOnUninstall": false,
-      "installerLanguages": ["zh_CN", "en_US"]
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ]
     }
   }
 }

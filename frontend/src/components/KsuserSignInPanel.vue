@@ -62,7 +62,7 @@ function submit(): void {
 </script>
 
 <template>
-  <section class="signin-shell" id="signInPanel">
+  <section class="signin-shell" id="signInPanel" @keydown.enter.prevent="submit">
     <article class="signin-rail">
       <div class="signin-brand-pill">
         <span class="signin-brand-mark">K</span>
@@ -88,7 +88,7 @@ function submit(): void {
       </div>
     </article>
 
-    <article class="signin-card">
+    <form class="signin-card" @submit.prevent="submit">
       <button
         v-if="showClose"
         class="signin-close"
@@ -110,7 +110,7 @@ function submit(): void {
         <code>{{ redirectUri }}</code>
       </div>
 
-      <button class="signin-submit" type="button" :disabled="busy" @click="submit">
+      <button class="signin-submit" type="submit" :disabled="busy">
         {{ busy ? '正在前往 Ksuser...' : '下一步' }}
       </button>
 
@@ -157,7 +157,7 @@ function submit(): void {
           <code>{{ authorizeEndpoint }}</code>
         </div>
       </details>
-    </article>
+    </form>
   </section>
 </template>
 

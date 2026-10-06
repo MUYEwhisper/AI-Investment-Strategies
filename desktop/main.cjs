@@ -1,5 +1,7 @@
 const { app, BrowserWindow, Menu, dialog, shell, screen, session } = require('electron')
 const path = require('node:path')
+const fs = require('node:fs')
+const { spawn } = require('node:child_process')
 const { SITE_URL, isAppNavigation, isExternalLink } = require('./navigation.cjs')
 const { readWindowState, saveWindowState } = require('./window-state.cjs')
 
@@ -17,6 +19,31 @@ function openExternal(url) {
   if (isExternalLink(url)) void shell.openExternal(url).catch(() => {})
 }
 
+function launchUninstaller() {
+  if (!app.isPackaged) {
+    void dialog.showMessageBox(mainWindow, {
+      type: 'info', title: '智能投资平台', message: '开发模式无需卸载。',
+      detail: '安装后的版本可以从“应用”菜单启动卸载程序，或在 Windows 设置 → 应用中卸载。',
+    })
+    return
+  }
+
+  const uninstallerDir = path.dirname(process.execPath)
+  const uninstaller = [
+    path.join(uninstallerDir, 'Uninstall 智能投资平台.exe'),
+    path.join(uninstallerDir, 'Uninstall AI Investment Strategies.exe'),
+  ].find((candidate) => fs.existsSync(candidate))
+  if (!uninstaller) {
+    void dialog.showMessageBox(mainWindow, {
+      type: 'warning', title: '找不到卸载程序',
+      message: '请从 Windows 设置 → 应用 → 已安装的应用中卸载智能投资平台。',
+    })
+    return
+  }
+  spawn(uninstaller, [], { detached: true, stdio: 'ignore' }).unref()
+  app.quit()
+}
+
 async function goHome() {
   if (!mainWindow || mainWindow.isDestroyed()) return
   try {
@@ -31,6 +58,7 @@ function installMenu() {
     { label: '应用', submenu: [
       { label: '市场总览', accelerator: 'Alt+Home', click: goHome },
       { label: '在浏览器中打开网站', click: () => openExternal(SITE_URL) },
+      { label: '卸载智能投资平台', click: launchUninstaller },
       { type: 'separator' },
       { label: '退出', role: 'quit' },
     ] },
