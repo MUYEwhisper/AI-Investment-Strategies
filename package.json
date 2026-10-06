@@ -1,7 +1,7 @@
 {
   "name": "ai-investment-strategies",
   "productName": "智能投资平台",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "智能投资平台 Windows 桌面客户端与前后端源码",
   "author": "MUYEwhisper",
   "private": true,
@@ -61,6 +61,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "智能投资平台",
+      "uninstallerName": "Uninstall 智能投资平台.exe",
       "deleteAppDataOnUninstall": false,
       "installerLanguages": [
         "zh_CN",
