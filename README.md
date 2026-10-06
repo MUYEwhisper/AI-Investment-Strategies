@@ -13,7 +13,7 @@
 
 ## 直接使用 Windows 应用
 
-运行 Release 中的 `AI-Investment-Strategies-Setup-1.0.0-x64.exe`，按安装程序提示安装。应用需要网络连接；登录、聊天、行情和账户数据均由服务器处理。安装器不会写入密钥，登录会话保存在 Electron 的应用用户数据目录中。升级或卸载时可保留用户数据。
+运行 Release 中最新的 `AI-Investment-Strategies-Setup-1.0.3-x64.exe`，按安装程序提示安装。应用需要网络连接；登录、聊天、行情和账户数据均由服务器处理。安装器不会写入密钥，登录会话保存在 Electron 的应用用户数据目录中。安装程序同时注册 Windows 卸载程序，应用菜单也提供“卸载智能投资平台”入口。
 
 当前桌面客户端加载 `https://www.muyewhisper.cn/`。如果服务器暂时不可达，应用会显示重连页面，点击“重新连接”或按 `Ctrl + R` 即可恢复。
 
