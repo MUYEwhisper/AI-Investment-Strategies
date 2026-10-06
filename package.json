@@ -1,53 +1,46 @@
 {
-  "name": "qianduan",
-  "version": "0.0.0",
+  "name": "ai-investment-strategies",
+  "productName": "智能投资平台",
+  "version": "1.0.0",
+  "description": "智能投资平台 Windows 桌面客户端与前后端源码",
+  "author": "MUYEwhisper",
   "private": true,
-  "type": "module",
+  "main": "desktop/main.cjs",
   "scripts": {
-    "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
-    "preview": "vite preview",
-    "test:unit": "vitest",
-    "test:e2e": "playwright test",
-    "build-only": "vite build",
-    "type-check": "vue-tsc --build",
-    "lint": "run-s lint:*",
-    "lint:oxlint": "oxlint . --fix",
-    "lint:eslint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/"
-  },
-  "dependencies": {
-    "pinia": "^3.0.4",
-    "vue": "^3.5.30",
-    "vue-router": "^5.0.3"
+    "desktop:dev": "electron .",
+    "desktop:test": "node --test desktop/tests/*.test.cjs",
+    "desktop:smoke": "node scripts/desktop-smoke.cjs",
+    "desktop:pack": "electron-builder --win --x64 --dir",
+    "desktop:build": "electron-builder --win nsis --x64",
+    "frontend:install": "npm ci --prefix frontend",
+    "frontend:dev": "npm run dev --prefix frontend",
+    "frontend:build": "npm run build --prefix frontend",
+    "frontend:test": "npm run test:unit --prefix frontend -- --run",
+    "verify:baseline": "node scripts/verify-baseline.cjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
-    "@tsconfig/node24": "^24.0.4",
-    "@types/jsdom": "^28.0.0",
-    "@types/node": "^24.12.0",
-    "@vitejs/plugin-vue": "^6.0.4",
-    "@vitest/eslint-plugin": "^1.6.10",
-    "@vue/eslint-config-typescript": "^14.7.0",
-    "@vue/test-utils": "^2.4.6",
-    "@vue/tsconfig": "^0.9.0",
-    "eslint": "^10.0.3",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-oxlint": "~1.51.0",
-    "eslint-plugin-playwright": "^2.9.0",
-    "eslint-plugin-vue": "~10.8.0",
-    "jiti": "^2.6.1",
-    "jsdom": "^28.1.0",
-    "npm-run-all2": "^8.0.4",
-    "oxlint": "~1.51.0",
-    "prettier": "3.8.1",
-    "typescript": "~5.9.3",
-    "vite": "^7.3.1",
-    "vite-plugin-vue-devtools": "^8.0.7",
-    "vitest": "^4.0.18",
-    "vue-tsc": "^3.2.5"
+    "@playwright/test": "1.58.2",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3"
   },
-  "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+  "engines": { "node": ">=22.12.0" },
+  "build": {
+    "appId": "cn.muyewhisper.investment",
+    "productName": "智能投资平台",
+    "artifactName": "AI-Investment-Strategies-Setup-${version}-${arch}.${ext}",
+    "directories": { "output": "release", "buildResources": "desktop/assets" },
+    "files": ["desktop/main.cjs", "desktop/navigation.cjs", "desktop/window-state.cjs", "desktop/offline.html", "desktop/assets/icon.ico", "package.json"],
+    "asar": true,
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "desktop/assets/icon.ico" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "智能投资平台",
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": ["zh_CN", "en_US"]
+    }
   }
 }

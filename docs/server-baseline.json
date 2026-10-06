@@ -1,0 +1,198 @@
+{
+  "capturedOn": "2026-10-06",
+  "timezone": "Asia/Shanghai",
+  "productionOrigin": "https://www.muyewhisper.cn",
+  "backendDirectory": "/work/StockAnalyzerPro",
+  "webDirectory": "/work/html",
+  "backendService": "stock-analyzer.service",
+  "frontendSourceFoundOnServer": false,
+  "frontendBuildByteIdentical": false,
+  "excluded": [
+    ".env",
+    ".venv",
+    "cache",
+    "data",
+    "__pycache__",
+    "*.pyc",
+    "*.bak*"
+  ],
+  "backendFiles": [
+    {
+      "path": "main.py",
+      "sha256": "46943d6230b1c96f25688eb4cdb767a78fa0573ecd6f5d8043320c0017696a67",
+      "localComparison": "identical"
+    },
+    {
+      "path": "pages/auth.py",
+      "sha256": "d360aaa06feed6d45f161ab63cd8e3127edf012906a97647b859c31475e22e61",
+      "localComparison": "identical"
+    },
+    {
+      "path": "pages/chat.py",
+      "sha256": "ef59db5971278fe741b3963263c32307d21726024a167723cea8abe1baf72448",
+      "localComparison": "identical"
+    },
+    {
+      "path": "pages/explain.py",
+      "sha256": "e9c81fcd895142b704b06476c95ddefdcb163e1ee81f88a6f94b347ce919b187",
+      "localComparison": "identical"
+    },
+    {
+      "path": "pages/portfolio.py",
+      "sha256": "28c054de0c04f9a8165e8a00fd167797ee3dda482a4780056baf8caa3230d2db",
+      "localComparison": "identical"
+    },
+    {
+      "path": "pages/profile.py",
+      "sha256": "7ce536a2bc2f4657d6199913ec858fc07fc6ffeede3be3aa22ea252afd3a1809",
+      "localComparison": "identical"
+    },
+    {
+      "path": "pages/sectors.py",
+      "sha256": "7c5d77a01786fe3f27536575fca6cdad0a11195073184756f640a6f0528bb540",
+      "localComparison": "identical"
+    },
+    {
+      "path": "pages/simulator.py",
+      "sha256": "50e8acb163a290ef33216ed57d01acf4fdcc78ffc38748a8f64d292128e2b21d",
+      "localComparison": "identical"
+    },
+    {
+      "path": "pages/stocks.py",
+      "sha256": "0a1d3927014c5db125f78828329456076648fccafeaa34aec2d0cc91ca28b43b",
+      "localComparison": "identical"
+    },
+    {
+      "path": "pages/user_data.py",
+      "sha256": "2337749694b25297283b75819fed5fbb6d73db03af175e92b16ebbdd9a24f617",
+      "localComparison": "identical"
+    },
+    {
+      "path": "requirements.txt",
+      "sha256": "7f62f7ce18fa53843f3f983062d67a9bb47c4a80dd50b54bd7b2b27499547b8d",
+      "localComparison": "identical"
+    },
+    {
+      "path": "static/whisper.png",
+      "sha256": "00b70d0d80a37c86d3033fc9ed727cb57d201c861624d83c4cd7bc06625b88c0",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/auth/__init__.py",
+      "sha256": "54ce441472dac05ee6631e60f9a2e7cb0a220a9a24579fa432873295744f1905",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/auth/context.py",
+      "sha256": "fff6e3b414b971010020a8b5dd5c2b4ed4c9e868e3b7fa79699d6605160994e6",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/auth/session.py",
+      "sha256": "87eaf6b51db891fec985d826eec092d3e7d22f79ab91488d6a9543dc54978db7",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/chat_memory.py",
+      "sha256": "878e71b8f38931ee76251f7ed06122e8da26ede2cba7d9de3a7fa8733526b6e6",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/db/__init__.py",
+      "sha256": "db51511ecfb5b5156b34a61a77cb0290aae67b6db8db0bee4e80be31ba02c801",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/db/mysql.py",
+      "sha256": "a3c627334e90f912a2021a9ca9ba7d00cb797b7f7022131b8f57f8d2b6e88afa",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/get_company_code.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/mcp/init.py",
+      "sha256": "d7c5d35feb01372b07af19fd4389cccb8fbba7ce8bc32921fa4644ed9cd08d66",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/mcp/tools.json",
+      "sha256": "904bd900ea2a7d1c61b4e3d4fbbf610fe14af7f3674c0bc92c9ec8c0df9c0fa1",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/models/availability.py",
+      "sha256": "f30459a93ba3a690c3ba4f8a5a0c5b3adbb86b68d49607cdf00a1eca39840774",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/models/deepseek.py",
+      "sha256": "c794f1861abc0ea48e1ff139418eba51a5509db9b3786fafe612e99ce9f9b779",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/models/download.py",
+      "sha256": "fe75a63a0840b38a560e673cb6fe78e728a9fe80719c2ab44204f2333f13b1d3",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/models/transformer.py",
+      "sha256": "5102325eea056910f51e147d6ad6673322a1eed103abbda50857748e096ed7ec",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/sectors/__init__.py",
+      "sha256": "f53826cbc11755d74ae20c93c534edfb004dbc61a456091153bfea91e9c70db2",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/sectors/service.py",
+      "sha256": "15dac319c550f24bc8f32f54a93b1951248a838bac5206eeaa24df5fa3927463",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/stocks/__init__.py",
+      "sha256": "526a80804beae81aa9b810328880e0ba166b0433647db46fddf7de146bf0f0d3",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/stocks/service.py",
+      "sha256": "9951b7011f3c785a1c71c843359743136139690b23af3d45b67754c0d38d47e4",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/workbench/__init__.py",
+      "sha256": "639fa148de3505c56f1171e3b8642e5f9c4f6425695d933acd9c414aedc3e634",
+      "localComparison": "identical"
+    },
+    {
+      "path": "utils/workbench/service.py",
+      "sha256": "92d50db4f62cf8fb53b17b28cef504144c2d08310b9945a360b20b1f8346b61a",
+      "localComparison": "identical"
+    }
+  ],
+  "webFiles": [
+    {
+      "path": "assets/index-BfbyNxcG.css",
+      "sha256": "6294b5269bed56caecfba91ffee49efae1e348ebc2d5b7a77a7c185203ec8d5c",
+      "localBuildMatches": true
+    },
+    {
+      "path": "assets/index-DePOa-I9.js",
+      "sha256": "8ac198eef9d74f14938187685a3669561170979b7cfd962c6d7b9b23caf4f8e1",
+      "localBuildMatches": true
+    },
+    {
+      "path": "index.html",
+      "sha256": "201556298e1187c6bc2352a431f5fcda68ae81a7273df21b892d14ad9006da61",
+      "localBuildMatches": true
+    },
+    {
+      "path": "site-icon.png",
+      "sha256": "513056f81f30201635f25646a44edcd70ccd99059d04d0e7d761d140833b04ff",
+      "localBuildMatches": true
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+from dotenv import load_dotenv
+import os
+import json
+from flask import Flask, render_template, request, Response
+from flask_cors import CORS
+
+
+load_dotenv()
+
+app = Flask(__name__, static_folder='static')
+
+if os.getenv('DEBUG', 'False').lower() == 'true':
+    app.config['DEBUG'] = True
+    host = "0.0.0.0"
+    CORS(app, 
+        resources={r"/*": {"origins": ["https://whisper.ksuser.cn", "https://muyewhisper.cn", "https://www.muyewhisper.cn", "https://www.muyewhisper.cn", "http://localhost:*", "http://127.0.0.1:*", "http://106.14.221.14"],}}, 
+        supports_credentials=True
+    )
+else:
+    host = "127.0.0.1"
+    app.config['DEBUG'] = False
+
+from pages.chat import chat_page
+from pages.auth import auth_page
+from pages.explain import explain_page
+from pages.portfolio import portfolio_page
+from pages.profile import profile_page
+from pages.sectors import sectors_page
+from pages.simulator import simulator_page
+from pages.stocks import stocks_page
+from pages.user_data import user_data_page
+
+app.register_blueprint(chat_page, url_prefix="/chat")
+app.register_blueprint(auth_page, url_prefix="/api/auth")
+app.register_blueprint(sectors_page, url_prefix="/api/sectors")
+app.register_blueprint(stocks_page, url_prefix="/api/stocks")
+app.register_blueprint(profile_page, url_prefix="/api/profile")
+app.register_blueprint(portfolio_page, url_prefix="/api/portfolio")
+app.register_blueprint(explain_page, url_prefix="/api/explain")
+app.register_blueprint(simulator_page, url_prefix="/api/sim")
+app.register_blueprint(user_data_page, url_prefix="/api/user")
+
+@app.route('/')
+def index():
+    return {"message": "worked"}
+
+if __name__ == "__main__":
+    app.run(debug=app.config['DEBUG'], host=host, port=8000)

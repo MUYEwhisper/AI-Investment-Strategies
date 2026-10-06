@@ -1,151 +1,81 @@
-# QIANDUAN
+# 智能投资平台（Windows 11 桌面版）
 
-一个基于 Vue 3 + TypeScript + Vite 的前端项目，提供「自选股管理 + 板块分析可视化 + AI 流式对话」的交互体验。
+这是 MUYEwhisper 的智能投资决策项目整合仓库。桌面客户端适用于 64 位 Windows 11，界面和业务功能与线上站点保持一致，业务请求直接连接生产服务器 `https://www.muyewhisper.cn/`。仓库同时保留 Vue 3 前端源码、Flask 后端同步快照、线上构建快照和可审计的服务器基线清单。
 
-## 项目特性
+## 项目结构
 
-- 自选股区
-  - 支持按股票名/代码添加股票。
-  - 支持删除股票、查看个股详情与关键指标。
-  - 内置过渡动画与交互状态控制。
-- 板块分析区
-  - 展示资金关注度与市场情绪饼图。
-  - 支持一键刷新板块模拟数据。
-  - Chart.js 采用运行时动态加载，避免安装依赖受限时阻塞页面功能。
-- AI 对话区
-  - 支持多会话历史管理（新建、切换、删除）。
-  - 支持 SSE 流式响应与推理模式切换。
-  - 对话历史持久化到浏览器 LocalStorage。
+- `frontend/`：Vue 3 + TypeScript + Vite + Pinia + Vue Router 前端源码。
+- `backend/`：从 `/work/StockAnalyzerPro` 同步的 Flask API，包含认证、股票、板块、聊天 SSE、策略工作台和模拟交易接口。
+- `desktop/`：Electron Windows 客户端。生产模式不启动本地 Python 或 MySQL，直接加载线上站点。
+- `deploy/site-snapshot/`：2026-10-06 从线上 `/work/html` 取得的网页部署快照。
+- `docs/server-baseline.json`：服务器文件的 SHA-256 基线及同步结果。
+- `scripts/`：基线校验和桌面冒烟脚本。
 
-## 技术栈
+## 直接使用 Windows 应用
 
-- 前端框架：Vue 3（Composition API）
-- 构建工具：Vite
-- 语言：TypeScript
-- 状态管理：Pinia
-- 路由：Vue Router
-- 单元测试：Vitest + Vue Test Utils + jsdom
-- 端到端测试：Playwright
-- 代码质量：ESLint + Oxlint + Prettier
+运行 Release 中的 `AI-Investment-Strategies-Setup-1.0.0-x64.exe`，按安装程序提示安装。应用需要网络连接；登录、聊天、行情和账户数据均由服务器处理。安装器不会写入密钥，登录会话保存在 Electron 的应用用户数据目录中。升级或卸载时可保留用户数据。
 
-## 运行环境
+当前桌面客户端加载 `https://www.muyewhisper.cn/`。如果服务器暂时不可达，应用会显示重连页面，点击“重新连接”或按 `Ctrl + R` 即可恢复。
 
-- Node.js：^20.19.0 或 >=22.12.0
-- npm：建议使用与 Node 版本匹配的最新稳定版
+## 本地开发
 
-## 快速开始
+需要 Node.js 22.12+（推荐 Node.js 24）和 npm。
 
-1. 安装依赖
-
-```bash
+```powershell
 npm install
+npm run desktop:dev
 ```
 
-2. 启动开发环境
+桌面端连接线上服务，不启动本地 Python 或 MySQL。若要开发前端源码：
 
-```bash
-npm run dev
+```powershell
+npm run frontend:install
+npm run frontend:dev
+npm run frontend:build
+npm run frontend:test
 ```
 
-3. 本地预览生产构建
+前端开发服务器默认把 `/api` 和 `/chat` 代理到 `http://localhost:8000`。可通过 `frontend/.env.local` 设置 `VITE_BACKEND_PROXY_TARGET=https://www.muyewhisper.cn` 进行线上接口联调。
 
-```bash
-npm run build
-npm run preview
+后端仅用于需要修改服务端逻辑时的本地开发：
+
+```powershell
+python -m venv backend/.venv
+backend/.venv/Scripts/pip install -r backend/requirements.txt
+# 根据 backend/.env.example 创建 backend/.env，再运行：
+backend/.venv/Scripts/python backend/main.py
 ```
 
-## 可用脚本
+本地后端需要 MySQL、AI 模型密钥、MCP 密钥和 Ksuser OAuth 配置。生产 `.env` 未从服务器下载，也不会提交到 GitHub。
 
-```bash
-npm run dev          # 启动开发服务器
-npm run build        # 类型检查 + 生产构建
-npm run build-only   # 仅执行 Vite 构建
-npm run preview      # 预览构建产物
-npm run type-check   # 仅执行 vue-tsc 类型检查
-npm run test:unit    # 运行 Vitest 单元测试
-npm run test:e2e     # 运行 Playwright E2E 测试
-npm run lint         # 执行 Oxlint + ESLint（自动修复）
-npm run format       # 使用 Prettier 格式化 src/
+## 验证与打包
+
+```powershell
+npm run verify:baseline
+npm run desktop:test
+npm run frontend:build
+npm run frontend:test
+npm run desktop:smoke
+npm run desktop:pack
+npm run desktop:build
 ```
 
-## AI SSE 接入说明
+桌面冒烟测试会检查主界面、服务器接口未登录响应、登录跳转是否仍在同一窗口、渲染器是否隔离 Node.js、断网恢复页和重连链接。安装包构建默认关闭代码签名自动发现；发布到正式渠道时应配置 Windows 代码签名证书。
 
-聊天区默认请求地址：/chat/endpoint
+## 服务器同步说明
 
-开发环境下，Vite 会将 /chat 代理到：http://localhost:8000
+服务器是运行基准。2026-10-06 通过 SSH 检查了 `/work/StockAnalyzerPro`、Gunicorn `stock-analyzer.service` 和 `/work/html`，并下载了后端有效源码与网页构建文件。服务器没有 Vue 源码，线上 JS/CSS/HTML 快照作为最终网页版本保存。生产数据库、`.env`、模型缓存和运行时数据不进入仓库。
 
-如需指定完整后端地址，可在项目根目录创建 .env.local：
+服务器连接示例（不要把密码写入脚本或提交记录）：
 
-```bash
-VITE_AI_CHAT_ENDPOINT=http://localhost:8000/chat/endpoint
+```powershell
+plink -ssh whisper@106.14.221.14 -P 22 -pw <PASSWORD> -L 3306:127.0.0.1:3306
 ```
 
-前端发送请求体示例：
+## 安全边界
 
-```json
-{
-  "prompt": "用户输入",
-  "stream": true,
-  "sse": true,
-  "thinking": true
-}
-```
+Electron 启用 `contextIsolation`、sandbox 和禁用 Node 集成；只允许线上站点、Ksuser OAuth 域名和 API 域名在应用窗口内导航，其他 HTTPS 链接使用系统浏览器打开，非 HTTPS 和带凭据 URL 会被拒绝。服务器密钥、数据库密码、AI/MCP 密钥和 OAuth secret 只能通过本地环境变量配置。
 
-前端支持解析以下 SSE 事件：
+## 免责声明
 
-- start
-- reasoning
-- tool_call
-- tool_result
-- message
-- error
-- end
-
-## 目录结构
-
-```text
-QIANDUAN/
-  src/
-    App.vue                # 主页面（自选股、板块分析、AI 对话）
-    main.ts                # 应用入口
-    router/index.ts        # 路由配置
-    stores/counter.ts      # Pinia 示例 store
-    __tests__/App.spec.ts  # 单元测试示例
-  e2e/
-    vue.spec.ts            # Playwright E2E 示例
-  vite.config.ts           # Vite 配置（含 /chat 代理）
-  vitest.config.ts         # Vitest 配置
-  playwright.config.ts     # Playwright 配置
-```
-
-## 测试说明
-
-- 单元测试
-
-```bash
-npm run test:unit
-```
-
-- 端到端测试
-
-```bash
-npx playwright install
-npm run test:e2e
-```
-
-说明：当前 e2e/vue.spec.ts 为示例用例，请根据现有页面结构与文案调整断言后再用于稳定回归。
-
-## CI 说明
-
-仓库包含 GitHub Actions 工作流：
-
-- 触发条件：push 到 master
-- 执行内容：npm ci -> npm run build
-- 产物上传：dist
-
-## 开发建议
-
-- 推荐 IDE：VS Code + Vue Official (Volar)
-- 推荐浏览器插件：Vue.js devtools
-- 提交前建议至少执行：npm run lint && npm run test:unit
-
+行情、模型分析和策略工作台内容仅供研究参考，不构成投资建议。投资有风险，决策请结合自身情况审慎判断。
