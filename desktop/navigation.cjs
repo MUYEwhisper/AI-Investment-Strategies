@@ -1,7 +1,7 @@
 const SITE_URL = 'https://www.muyewhisper.cn/'
+const SITE_ORIGINS = new Set([new URL(SITE_URL).origin, 'https://muyewhisper.cn'])
 const APP_ORIGINS = new Set([
-  new URL(SITE_URL).origin,
-  'https://muyewhisper.cn',
+  ...SITE_ORIGINS,
   'https://auth.ksuser.cn',
   'https://api.ksuser.cn',
   'https://ksuser.cn',
@@ -22,8 +22,13 @@ function isAppNavigation(value) {
   return Boolean(url && APP_ORIGINS.has(url.origin))
 }
 
+function isWebsiteNavigation(value) {
+  const url = parseHttpsUrl(value)
+  return Boolean(url && SITE_ORIGINS.has(url.origin))
+}
+
 function isExternalLink(value) {
   return Boolean(parseHttpsUrl(value))
 }
 
-module.exports = { SITE_URL, isAppNavigation, isExternalLink }
+module.exports = { SITE_URL, isAppNavigation, isWebsiteNavigation, isExternalLink }

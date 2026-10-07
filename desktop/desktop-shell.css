@@ -1,0 +1,260 @@
+/* Desktop-only chrome. The same Vue bundle remains untouched for browsers. */
+.desktop-shell,
+.desktop-shell body {
+  background: #0d1726 !important;
+}
+
+.desktop-shell .app-page {
+  --desktop-bg: #eef3f8;
+  --desktop-ink: #17283e;
+  --desktop-muted: #708198;
+  --desktop-line: #d9e2ec;
+  min-height: 100vh;
+  padding: 0 18px 24px;
+  color: var(--desktop-ink);
+  background: var(--desktop-bg);
+}
+
+.desktop-shell .app-page::before {
+  display: none;
+}
+
+.desktop-shell .app {
+  width: 100%;
+  max-width: 1720px;
+  gap: 14px;
+}
+
+.desktop-shell .page-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  align-items: center;
+  min-height: 74px;
+  margin: 0 -18px;
+  padding: 12px 22px;
+  border: 0;
+  border-bottom: 1px solid rgba(157, 181, 211, 0.2);
+  border-radius: 0 0 14px 14px;
+  background: linear-gradient(115deg, #101c2d 0%, #16263b 58%, #1e3852 100%);
+  box-shadow: 0 10px 26px rgba(7, 20, 38, 0.24);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.desktop-shell .page-copy {
+  min-width: 196px;
+  gap: 4px;
+}
+
+.desktop-shell .page-kicker {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: #69d2cc;
+}
+
+.desktop-shell .page-title {
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+
+.desktop-shell .page-subtitle {
+  display: none;
+}
+
+.desktop-shell .header-actions {
+  gap: 10px;
+}
+
+.desktop-shell .desktop-client-link {
+  display: none !important;
+}
+
+.desktop-shell .page-switcher {
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(168, 194, 222, 0.18);
+  border-radius: 8px;
+  background: rgba(5, 15, 28, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.desktop-shell .page-switch {
+  min-width: 108px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #a9bdd3;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.desktop-shell .page-switch:hover {
+  background: rgba(110, 172, 225, 0.16);
+  color: #f5f9ff;
+}
+
+.desktop-shell .page-switch.active {
+  color: #eaf7ff;
+  background: #2b75b8;
+  box-shadow: 0 5px 12px rgba(22, 91, 150, 0.28);
+  animation: none;
+}
+
+.desktop-shell .page-switch-locked {
+  color: #778ca5;
+}
+
+.desktop-shell .guest-chip,
+.desktop-shell .user-chip,
+.desktop-shell .user-toolbar .btn,
+.desktop-shell .guest-toolbar .btn {
+  min-height: 34px;
+  border-color: rgba(174, 202, 229, 0.22);
+  border-radius: 7px;
+  background: rgba(8, 20, 35, 0.42);
+  color: #d8e6f5;
+  box-shadow: none;
+}
+
+.desktop-shell .guest-chip {
+  padding: 0 11px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.desktop-shell .user-chip {
+  padding: 4px 9px 4px 5px;
+}
+
+.desktop-shell .user-chip-copy small {
+  color: #8ca3bc;
+}
+
+.desktop-shell .workspace-stage,
+.desktop-shell .page-stage {
+  gap: 12px;
+}
+
+.desktop-shell .panel {
+  border: 1px solid var(--desktop-line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(43, 66, 93, 0.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.desktop-shell .panel-header {
+  min-height: 58px;
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--desktop-line);
+  background: #f8fafc;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.desktop-shell .panel-header::after {
+  display: none;
+}
+
+.desktop-shell .panel-title {
+  color: #1e3852;
+  font-size: 14px;
+  letter-spacing: 0.03em;
+}
+
+.desktop-shell .panel-subtitle {
+  color: var(--desktop-muted);
+  font-size: 11px;
+}
+
+.desktop-shell .btn {
+  border-color: #c9d7e5;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #2d4967;
+  box-shadow: 0 2px 5px rgba(31, 58, 86, 0.08);
+}
+
+.desktop-shell .btn:hover {
+  border-color: #77add6;
+  background: #eef7ff;
+  color: #17649c;
+  box-shadow: 0 4px 10px rgba(43, 117, 184, 0.14);
+}
+
+.desktop-shell .btn.primary {
+  border-color: #286da7;
+  background: #2b75b8;
+  color: #ffffff;
+}
+
+.desktop-shell .btn.primary:hover {
+  background: #23659f;
+  color: #ffffff;
+}
+
+.desktop-shell .top-grid {
+  height: clamp(470px, 56vh, 620px);
+}
+
+.desktop-shell .watchlist-view,
+.desktop-shell .history-list,
+.desktop-shell .messages,
+.desktop-shell .sector-body,
+.desktop-shell .strategy-workbench {
+  scrollbar-color: #b8c9da transparent;
+}
+
+.desktop-shell .watchlist-guest-card,
+.desktop-shell .history-guest-card,
+.desktop-shell .guest-banner {
+  border-color: #d9e6f1;
+  background: #f7fafc;
+}
+
+.desktop-shell .note,
+.desktop-shell .stock-status-note,
+.desktop-shell .sector-status-note {
+  color: #708198;
+}
+
+.desktop-shell .auth-callback-panel,
+.desktop-shell .signin-shell {
+  margin-top: 12px;
+}
+
+@media (max-width: 1120px) {
+  .desktop-shell .page-header {
+    align-items: flex-start;
+  }
+
+  .desktop-shell .header-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 760px) {
+  .desktop-shell .page-header {
+    margin: 0 -10px;
+    padding-inline: 14px;
+  }
+
+  .desktop-shell .app-page {
+    padding-inline: 10px;
+  }
+
+  .desktop-shell .page-copy {
+    min-width: 0;
+  }
+
+  .desktop-shell .page-title {
+    font-size: 18px;
+  }
+
+  .desktop-shell .page-switch {
+    min-width: auto;
+    padding-inline: 8px;
+  }
+}

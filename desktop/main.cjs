@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu, dialog, shell, screen, session } = require('el
 const path = require('node:path')
 const fs = require('node:fs')
 const { spawn } = require('node:child_process')
-const { SITE_URL, isAppNavigation, isExternalLink } = require('./navigation.cjs')
+const { SITE_URL, isAppNavigation, isWebsiteNavigation, isExternalLink } = require('./navigation.cjs')
 const { readWindowState, saveWindowState } = require('./window-state.cjs')
 
 // A stable profile keeps website sessions and account-scoped local storage across upgrades.
@@ -14,6 +14,28 @@ if (!app.isPackaged && process.env.AI_INVEST_TEST_PROFILE) {
 
 let mainWindow
 const offlineFile = path.join(__dirname, 'offline.html')
+const desktopShellCssFile = path.join(__dirname, 'desktop-shell.css')
+
+let desktopShellCss
+try {
+  desktopShellCss = fs.readFileSync(desktopShellCssFile, 'utf8')
+} catch {
+  desktopShellCss = ''
+}
+
+async function applyDesktopShell(contents) {
+  if (!desktopShellCss || !isWebsiteNavigation(contents.getURL())) return
+  try {
+    await contents.insertCSS(desktopShellCss)
+    await contents.executeJavaScript(`
+      document.documentElement.classList.add('desktop-shell')
+      document.body?.setAttribute('data-client', 'windows-desktop')
+      document.querySelector('#desktopClientDownloadLink')?.setAttribute('hidden', 'hidden')
+    `, true)
+  } catch {
+    // Styling is an enhancement; network-backed application functionality remains available.
+  }
+}
 
 function openExternal(url) {
   if (isExternalLink(url)) void shell.openExternal(url).catch(() => {})
@@ -131,6 +153,9 @@ function createWindow() {
     if (isMainFrame && code !== -3 && isAppNavigation(url)) {
       void mainWindow.loadFile(offlineFile).catch(() => {})
     }
+  })
+  contents.on('did-finish-load', () => {
+    void applyDesktopShell(contents)
   })
   installMenu()
   void goHome()

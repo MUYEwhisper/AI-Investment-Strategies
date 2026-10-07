@@ -1339,8 +1339,9 @@ onBeforeUnmount(() => {
             target="_blank"
             rel="noreferrer"
             id="desktopClientDownloadLink"
+            aria-label="下载 Windows 桌面客户端"
           >
-            下载桌面客户端
+            下载 Windows 客户端
           </a>
           <nav class="page-switcher" aria-label="页面导航">
             <RouterLink class="page-switch" :class="{ active: isDashboardRoute }" to="/" id="pageNavDashboard">
