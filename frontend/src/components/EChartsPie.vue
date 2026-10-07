@@ -77,6 +77,7 @@ function buildOption(): Record<string, unknown> {
       formatter: '{b}<br/>{a}: {c}',
     },
     legend: {
+      show: hasData,
       type: 'scroll',
       bottom: 0,
       left: 'center',
@@ -96,14 +97,14 @@ function buildOption(): Record<string, unknown> {
             left: 'center',
             top: 'middle',
             style: {
-              text: props.loading ? '加载中...' : props.emptyText,
+              text: props.loading ? '加载中...' : '暂无数据',
               fill: '#6b7c93',
               fontSize: 14,
               fontWeight: 600,
             },
           },
         ],
-    series: [
+    series: hasData ? [
       {
         name: props.seriesName,
         type: 'pie',
@@ -129,7 +130,7 @@ function buildOption(): Record<string, unknown> {
         data: props.items,
         color: ['#2f80ed', '#19b58f', '#f97316', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'],
       },
-    ],
+    ] : [],
   }
 }
 

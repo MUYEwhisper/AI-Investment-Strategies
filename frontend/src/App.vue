@@ -121,7 +121,7 @@ const pageDescription = computed(() =>
   isAuthCallbackRoute.value
     ? '正在校验授权结果、换取 Access Token 并同步用户资料，请稍候片刻。'
     : isAccountRoute.value
-      ? '查看当前 Ksuser 登录会话、OpenID / UnionID 标识和授权范围。'
+      ? '查看当前 Ksuser 登录会话、授权范围和设备状态。'
       : isStrategyRoute.value
         ? '集中处理策略分析、组合体检、模拟交易和异常解释。'
         : authStore.isAuthenticated
@@ -1568,7 +1568,7 @@ onBeforeUnmount(() => {
               <div v-if="sectorStatusNote" class="sector-status-note">{{ sectorStatusNote }}</div>
               <div class="pie-grid">
                 <div class="pie-box">
-                  <div class="pie-title">资金关注度占比</div>
+                  <div class="pie-title">资金关注</div>
                   <div class="pie-wrap">
                     <EChartsPie
                       id="flowChart"
@@ -1576,12 +1576,12 @@ onBeforeUnmount(() => {
                       mode="donut"
                       series-name="资金关注度"
                       :loading="isSectorLoading"
-                      empty-text="暂无资金关注度数据"
+                      empty-text="暂无资金关注数据"
                     />
                   </div>
                 </div>
                 <div class="pie-box">
-                  <div class="pie-title">市场情绪占比</div>
+                  <div class="pie-title">市场情绪</div>
                   <div class="pie-wrap">
                     <EChartsPie
                       id="sentimentChart"
@@ -1589,7 +1589,7 @@ onBeforeUnmount(() => {
                       mode="pie"
                       series-name="市场情绪"
                       :loading="isSectorLoading"
-                      empty-text="暂无市场情绪数据"
+                      empty-text="暂无情绪数据"
                     />
                   </div>
                 </div>

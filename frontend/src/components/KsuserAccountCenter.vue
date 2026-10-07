@@ -20,7 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const displayName = computed(
-  () => props.session.profile.nickname || props.session.profile.email || `Ksuser 用户 ${props.session.openid.slice(0, 8)}`,
+  () => props.session.profile.nickname || props.session.profile.email || 'Ksuser 用户',
 )
 
 const expiresAtText = computed(() =>
@@ -29,11 +29,6 @@ const expiresAtText = computed(() =>
   }),
 )
 
-const tokenPreview = computed(() => {
-  const token = props.session.accessToken
-  if (token.length <= 18) return token
-  return `${token.slice(0, 10)}...${token.slice(-8)}`
-})
 </script>
 
 <template>
@@ -63,20 +58,8 @@ const tokenPreview = computed(() => {
 
     <div class="account-grid">
       <article class="panel account-card">
-        <div class="panel-title">身份标识</div>
+        <div class="panel-title">授权范围</div>
         <dl class="account-info">
-          <div>
-            <dt>OpenID</dt>
-            <dd>{{ session.openid }}</dd>
-          </div>
-          <div>
-            <dt>UnionID</dt>
-            <dd>{{ session.unionid }}</dd>
-          </div>
-          <div v-if="session.profile.sub">
-            <dt>Sub</dt>
-            <dd>{{ session.profile.sub }}</dd>
-          </div>
           <div>
             <dt>已授权 Scope</dt>
             <dd>{{ session.scopeText }}</dd>
@@ -90,18 +73,6 @@ const tokenPreview = computed(() => {
           <div>
             <dt>过期时间</dt>
             <dd>{{ expiresAtText }}</dd>
-          </div>
-          <div>
-            <dt>Token 预览</dt>
-            <dd>{{ tokenPreview }}</dd>
-          </div>
-          <div>
-            <dt>回调地址</dt>
-            <dd>{{ redirectUri }}</dd>
-          </div>
-          <div>
-            <dt>OIDC 配置</dt>
-            <dd>{{ openidConfigurationEndpoint }}</dd>
           </div>
         </dl>
       </article>

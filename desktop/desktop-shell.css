@@ -1,18 +1,23 @@
-/* Desktop-only chrome. The same Vue bundle remains untouched for browsers. */
-.desktop-shell,
-.desktop-shell body {
-  background: #0d1726 !important;
+/* Desktop-only application chrome. The Vue site remains unchanged in browsers. */
+:root.desktop-shell,
+:root.desktop-shell body {
+  background: #e9eef4 !important;
 }
 
 .desktop-shell .app-page {
-  --desktop-bg: #eef3f8;
+  --desktop-bg: #e9eef4;
   --desktop-ink: #17283e;
-  --desktop-muted: #708198;
-  --desktop-line: #d9e2ec;
+  --desktop-muted: #6b7b8f;
+  --desktop-line: #d5dee8;
+  --desktop-blue: #2f76b5;
+  display: grid;
+  grid-template-columns: 218px minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
   min-height: 100vh;
-  padding: 0 18px 24px;
+  padding: 18px;
   color: var(--desktop-ink);
-  background: var(--desktop-bg);
+  background: var(--desktop-bg) !important;
 }
 
 .desktop-shell .app-page::before {
@@ -21,42 +26,164 @@
 
 .desktop-shell .app {
   width: 100%;
-  max-width: 1720px;
+  max-width: none;
+  min-width: 0;
   gap: 14px;
+}
+
+/* Injected by desktop/main.cjs. This is the persistent workspace navigation. */
+.desktop-shell .desktop-sidebar {
+  position: sticky;
+  top: 18px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 36px);
+  padding: 18px 12px 14px;
+  border: 1px solid #263d56;
+  border-radius: 10px;
+  background: #17283e;
+  color: #eef5fb;
+  box-shadow: 0 8px 22px rgba(26, 48, 73, 0.16);
+}
+
+.desktop-shell .desktop-sidebar-brand {
+  display: grid;
+  gap: 5px;
+  padding: 2px 8px 18px;
+  border-bottom: 1px solid rgba(228, 239, 248, 0.15);
+}
+
+.desktop-shell .desktop-sidebar-brand strong {
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+
+.desktop-shell .desktop-sidebar-brand span {
+  color: #9db1c6;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.desktop-shell .desktop-sidebar-section {
+  margin: 18px 8px 8px;
+  color: #7f96ae;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.desktop-shell .desktop-sidebar-nav {
+  display: grid;
+  gap: 5px;
+}
+
+.desktop-shell .desktop-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #c5d3e1;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.desktop-shell .desktop-sidebar-item::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #70869b;
+}
+
+.desktop-shell .desktop-sidebar-item:hover {
+  border-color: rgba(145, 183, 216, 0.25);
+  background: #203952;
+  color: #ffffff;
+}
+
+.desktop-shell .desktop-sidebar-item[aria-current='page'] {
+  border-color: #3e86bf;
+  background: #2a5e8e;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.desktop-shell .desktop-sidebar-item[aria-current='page']::before {
+  background: #b6e1ff;
+  box-shadow: 0 0 0 3px rgba(182, 225, 255, 0.15);
+}
+
+.desktop-shell .desktop-sidebar-foot {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+  padding: 14px 8px 2px;
+  border-top: 1px solid rgba(228, 239, 248, 0.15);
+}
+
+.desktop-shell .desktop-sidebar-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #9db1c6;
+  font-size: 11px;
+}
+
+.desktop-shell .desktop-sidebar-status::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4fc38b;
+}
+
+.desktop-shell .desktop-sidebar-version {
+  color: #738aa1;
+  font-size: 10px;
 }
 
 .desktop-shell .page-header {
   position: sticky;
-  top: 0;
+  top: 18px;
   z-index: 20;
   align-items: center;
-  min-height: 74px;
-  margin: 0 -18px;
-  padding: 12px 22px;
-  border: 0;
-  border-bottom: 1px solid rgba(157, 181, 211, 0.2);
-  border-radius: 0 0 14px 14px;
-  background: linear-gradient(115deg, #101c2d 0%, #16263b 58%, #1e3852 100%);
-  box-shadow: 0 10px 26px rgba(7, 20, 38, 0.24);
+  min-height: 68px;
+  padding: 12px 16px;
+  border: 1px solid var(--desktop-line);
+  border-radius: 8px;
+  background: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(26, 48, 73, 0.08);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
 .desktop-shell .page-copy {
   min-width: 196px;
-  gap: 4px;
+  gap: 3px;
 }
 
 .desktop-shell .page-kicker {
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  color: #69d2cc;
+  color: var(--desktop-blue);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
 }
 
 .desktop-shell .page-title {
-  font-size: 22px;
+  color: var(--desktop-ink);
+  font-size: 21px;
   line-height: 1.1;
-  letter-spacing: 0.02em;
 }
 
 .desktop-shell .page-subtitle {
@@ -64,45 +191,12 @@
 }
 
 .desktop-shell .header-actions {
-  gap: 10px;
+  gap: 8px;
 }
 
-.desktop-shell .desktop-client-link {
-  display: none !important;
-}
-
+.desktop-shell .desktop-client-link,
 .desktop-shell .page-switcher {
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid rgba(168, 194, 222, 0.18);
-  border-radius: 8px;
-  background: rgba(5, 15, 28, 0.58);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.desktop-shell .page-switch {
-  min-width: 108px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  color: #a9bdd3;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.desktop-shell .page-switch:hover {
-  background: rgba(110, 172, 225, 0.16);
-  color: #f5f9ff;
-}
-
-.desktop-shell .page-switch.active {
-  color: #eaf7ff;
-  background: #2b75b8;
-  box-shadow: 0 5px 12px rgba(22, 91, 150, 0.28);
-  animation: none;
-}
-
-.desktop-shell .page-switch-locked {
-  color: #778ca5;
+  display: none !important;
 }
 
 .desktop-shell .guest-chip,
@@ -110,48 +204,53 @@
 .desktop-shell .user-toolbar .btn,
 .desktop-shell .guest-toolbar .btn {
   min-height: 34px;
-  border-color: rgba(174, 202, 229, 0.22);
+  border-color: #c9d6e3;
   border-radius: 7px;
-  background: rgba(8, 20, 35, 0.42);
-  color: #d8e6f5;
+  background: #f7f9fb;
+  color: #304861;
   box-shadow: none;
 }
 
 .desktop-shell .guest-chip {
-  padding: 0 11px;
+  padding: 0 10px;
   font-size: 11px;
-  letter-spacing: 0.04em;
 }
 
 .desktop-shell .user-chip {
   padding: 4px 9px 4px 5px;
+  background: #f7f9fb;
 }
 
 .desktop-shell .user-chip-copy small {
-  color: #8ca3bc;
+  color: #72849a;
 }
 
-.desktop-shell .workspace-stage,
-.desktop-shell .page-stage {
-  gap: 12px;
+.desktop-shell .page-stage,
+.desktop-shell .workspace-stage {
+  min-width: 0;
+  gap: 14px;
 }
 
-.desktop-shell .panel {
-  border: 1px solid var(--desktop-line);
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 8px 22px rgba(43, 66, 93, 0.08);
+.desktop-shell .panel,
+.desktop-shell .chart-card,
+.desktop-shell .insight-card,
+.desktop-shell .pie-box,
+.desktop-shell .kpi,
+.desktop-shell .account-session-item {
+  border-color: var(--desktop-line);
+  border-radius: 8px;
+  background: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(26, 48, 73, 0.07);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
 .desktop-shell .panel-header {
-  min-height: 58px;
-  padding: 12px 15px;
+  min-height: 54px;
+  padding: 11px 14px;
   border-bottom: 1px solid var(--desktop-line);
-  background: #f8fafc;
+  background: #f7f9fb !important;
   backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .desktop-shell .panel-header::after {
@@ -161,42 +260,58 @@
 .desktop-shell .panel-title {
   color: #1e3852;
   font-size: 14px;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
 }
 
-.desktop-shell .panel-subtitle {
+.desktop-shell .panel-subtitle,
+.desktop-shell .note,
+.desktop-shell .stock-status-note,
+.desktop-shell .sector-status-note {
   color: var(--desktop-muted);
-  font-size: 11px;
 }
 
 .desktop-shell .btn {
   border-color: #c9d7e5;
-  border-radius: 7px;
+  border-radius: 6px;
   background: #ffffff;
   color: #2d4967;
-  box-shadow: 0 2px 5px rgba(31, 58, 86, 0.08);
+  box-shadow: none;
 }
 
 .desktop-shell .btn:hover {
   border-color: #77add6;
   background: #eef7ff;
   color: #17649c;
-  box-shadow: 0 4px 10px rgba(43, 117, 184, 0.14);
+  box-shadow: none;
 }
 
 .desktop-shell .btn.primary {
-  border-color: #286da7;
-  background: #2b75b8;
+  border-color: var(--desktop-blue);
+  background: var(--desktop-blue);
   color: #ffffff;
 }
 
 .desktop-shell .btn.primary:hover {
-  background: #23659f;
+  background: #256397;
   color: #ffffff;
 }
 
 .desktop-shell .top-grid {
-  height: clamp(470px, 56vh, 620px);
+  height: clamp(470px, 58vh, 640px);
+}
+
+.desktop-shell .app-page.desktop-view-market .chat-panel {
+  display: none !important;
+}
+
+.desktop-shell .app-page.desktop-view-ai .top-grid {
+  display: none !important;
+}
+
+.desktop-shell .app-page.desktop-view-ai .chat-panel {
+  display: flex !important;
+  height: calc(100vh - 122px);
+  min-height: 540px;
 }
 
 .desktop-shell .watchlist-view,
@@ -210,51 +325,150 @@
 .desktop-shell .watchlist-guest-card,
 .desktop-shell .history-guest-card,
 .desktop-shell .guest-banner {
-  border-color: #d9e6f1;
-  background: #f7fafc;
+  border-color: var(--desktop-line);
+  border-radius: 8px;
+  background: #f7fafc !important;
+  box-shadow: none;
 }
 
-.desktop-shell .note,
-.desktop-shell .stock-status-note,
-.desktop-shell .sector-status-note {
-  color: #708198;
+.desktop-shell .watchlist-guest-card,
+.desktop-shell .add-stock,
+.desktop-shell .sector-body,
+.desktop-shell .chat-main,
+.desktop-shell .watchlist-view,
+.desktop-shell .stock-detail-view {
+  background: #ffffff !important;
+}
+
+.desktop-shell .add-stock input {
+  border-color: #ccd9e5;
+  border-radius: 6px;
+  background: #ffffff !important;
+  box-shadow: none;
+}
+
+.desktop-shell .add-stock input:focus {
+  border-color: #5d9bca;
+  box-shadow: 0 0 0 3px rgba(47, 118, 181, 0.14);
+}
+
+.desktop-shell .stock-item,
+.desktop-shell .insight-item,
+.desktop-shell .summary-item {
+  border-color: var(--desktop-line);
+  border-radius: 6px;
+  background: #f8fafc !important;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.desktop-shell .stock-item:hover {
+  border-color: #8bb7d6;
+  background: #f0f7fc !important;
+  transform: none;
+  box-shadow: none;
+}
+
+.desktop-shell .chart-card,
+.desktop-shell .insight-card {
+  box-shadow: none;
+}
+
+.desktop-shell .pie-box {
+  padding: 9px;
+}
+
+.desktop-shell .pie-title {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.desktop-shell .account-hero,
+.desktop-shell .account-card {
+  border-radius: 8px;
+}
+
+.desktop-shell .account-avatar,
+.desktop-shell .account-avatar-fallback {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.desktop-shell .account-avatar-fallback {
+  background: #2f76b5;
 }
 
 .desktop-shell .auth-callback-panel,
 .desktop-shell .signin-shell {
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 @media (max-width: 1120px) {
-  .desktop-shell .page-header {
-    align-items: flex-start;
+  .desktop-shell .app-page {
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
   }
 
-  .desktop-shell .header-actions {
-    justify-content: flex-end;
+  .desktop-shell .desktop-sidebar {
+    top: 12px;
+    min-height: calc(100vh - 24px);
+  }
+
+  .desktop-shell .page-header {
+    top: 12px;
   }
 }
 
 @media (max-width: 760px) {
-  .desktop-shell .page-header {
-    margin: 0 -10px;
-    padding-inline: 14px;
-  }
-
   .desktop-shell .app-page {
-    padding-inline: 10px;
+    display: block;
+    padding: 10px;
   }
 
-  .desktop-shell .page-copy {
-    min-width: 0;
+  .desktop-shell .desktop-sidebar {
+    position: static;
+    min-height: 0;
+    margin-bottom: 10px;
+    padding: 10px;
   }
 
-  .desktop-shell .page-title {
-    font-size: 18px;
+  .desktop-shell .desktop-sidebar-brand {
+    padding: 2px 6px 10px;
   }
 
-  .desktop-shell .page-switch {
-    min-width: auto;
-    padding-inline: 8px;
+  .desktop-shell .desktop-sidebar-section,
+  .desktop-shell .desktop-sidebar-foot {
+    display: none;
+  }
+
+  .desktop-shell .desktop-sidebar-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .desktop-shell .desktop-sidebar-item {
+    justify-content: center;
+    min-height: 34px;
+    padding: 0 6px;
+    font-size: 11px;
+  }
+
+  .desktop-shell .desktop-sidebar-item::before {
+    display: none;
+  }
+
+  .desktop-shell .page-header {
+    position: static;
+  }
+
+  .desktop-shell .top-grid {
+    height: auto;
+  }
+
+  .desktop-shell .app-page.desktop-view-ai .chat-panel {
+    height: auto;
+    min-height: 560px;
   }
 }

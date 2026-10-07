@@ -18,9 +18,15 @@ async function main() {
     const page = await application.firstWindow()
     await expect(page.locator('#watchlistPanel')).toBeVisible({ timeout: 60000 })
     await expect(page.locator('html.desktop-shell')).toHaveCount(1)
+    await expect(page.locator('.desktop-sidebar')).toBeVisible()
+    await expect(page.locator('.desktop-sidebar-item')).toHaveCount(4)
     await expect(page.locator('#desktopClientDownloadLink')).toBeHidden()
-    await expect(page.locator('#pageNavStrategyLocked')).toBeVisible()
     await expect(page.locator('.login-entry-btn')).toBeVisible()
+    await page.locator('.desktop-sidebar-item[data-route="ai"]').click()
+    await expect(page.locator('.chat-panel')).toBeVisible()
+    await expect(page.locator('#watchlistPanel')).toBeHidden()
+    await page.locator('.desktop-sidebar-item[data-route="market"]').click()
+    await expect(page.locator('#watchlistPanel')).toBeVisible()
     const security = await page.evaluate(() => ({
       nodeUnavailable: typeof window.require === 'undefined' && typeof window.process === 'undefined',
       origin: window.location.origin,
