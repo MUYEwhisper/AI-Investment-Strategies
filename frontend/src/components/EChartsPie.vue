@@ -66,7 +66,8 @@ function ensureEChartsLoaded(): Promise<void> {
 }
 
 function buildOption(): Record<string, unknown> {
-  const hasData = props.items.length > 0
+  const chartItems = props.items.filter((item) => Number.isFinite(item.value) && item.value > 0)
+  const hasData = chartItems.length > 0
   const radius = props.mode === 'donut' ? ['56%', '78%'] : ['0%', '78%']
 
   return {
@@ -97,7 +98,7 @@ function buildOption(): Record<string, unknown> {
             left: 'center',
             top: 'middle',
             style: {
-              text: props.loading ? '加载中...' : '暂无数据',
+              text: props.loading ? '加载中...' : props.emptyText,
               fill: '#6b7c93',
               fontSize: 14,
               fontWeight: 600,
@@ -127,7 +128,7 @@ function buildOption(): Record<string, unknown> {
           borderColor: 'rgba(255, 255, 255, 0.95)',
           borderWidth: 2,
         },
-        data: props.items,
+        data: chartItems,
         color: ['#2f80ed', '#19b58f', '#f97316', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'],
       },
     ] : [],
