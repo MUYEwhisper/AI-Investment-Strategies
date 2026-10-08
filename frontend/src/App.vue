@@ -1413,8 +1413,6 @@ onBeforeUnmount(() => {
           <KsuserAccountCenter
             v-else-if="isAccountRoute && authStore.session"
             :session="authStore.session"
-            :redirect-uri="authConfig.redirectUri"
-            :openid-configuration-endpoint="authConfig.openidConfigurationEndpoint"
             :sessions="accountSessions"
             :busy="accountActionBusy"
             :error-message="accountActionError"

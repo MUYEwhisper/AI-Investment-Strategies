@@ -375,6 +375,51 @@
   box-shadow: none;
 }
 
+.desktop-shell .chat-sidebar,
+.desktop-shell .chat-body,
+.desktop-shell .chat-status,
+.desktop-shell .history-head,
+.desktop-shell .agent-focus,
+.desktop-shell .agent-option,
+.desktop-shell .history-item,
+.desktop-shell .messages,
+.desktop-shell .chat-input-wrap textarea,
+.desktop-shell .msg {
+  border-color: var(--desktop-line);
+  border-radius: 7px;
+  background: #ffffff !important;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.desktop-shell .agent-focus:hover,
+.desktop-shell .agent-focus.active,
+.desktop-shell .agent-option:hover,
+.desktop-shell .agent-option.active,
+.desktop-shell .history-item:hover,
+.desktop-shell .history-item.active {
+  border-color: #8bb7d6;
+  background: #eef5fa !important;
+  transform: none;
+  box-shadow: none;
+}
+
+.desktop-shell .chat-input-wrap textarea:focus {
+  border-color: #5d9bca;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(47, 118, 181, 0.14);
+}
+
+.desktop-shell .msg.user {
+  border-color: #bfd4e6;
+  background: #edf4f9 !important;
+}
+
+.desktop-shell .msg.ai {
+  background: #ffffff !important;
+}
+
 .desktop-shell .pie-box {
   padding: 9px;
 }

@@ -5,8 +5,6 @@ import type { KsuserSession } from '../services/ksuser-auth'
 
 const props = defineProps<{
   session: KsuserSession
-  redirectUri: string
-  openidConfigurationEndpoint: string
   sessions: AccountSession[]
   busy: boolean
   errorMessage: string
