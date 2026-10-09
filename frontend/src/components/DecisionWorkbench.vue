@@ -1946,9 +1946,9 @@ onMounted(async () => {
 .trade-extra-enter-active,
 .trade-extra-leave-active {
   transition:
-    opacity 0.24s ease,
-    transform 0.24s ease,
-    max-height 0.24s ease;
+    opacity var(--motion-normal) var(--motion-ease),
+    transform var(--motion-normal) var(--motion-ease),
+    max-height var(--motion-normal) var(--motion-ease);
   overflow: hidden;
 }
 

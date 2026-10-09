@@ -45,6 +45,8 @@ async function applyDesktopShell(contents) {
           if (!page.classList.contains(activeClass) || viewClasses.some((name) => name !== activeClass && page.classList.contains(name))) {
             page.classList.remove(...viewClasses)
             page.classList.add(activeClass)
+            window.dispatchEvent(new CustomEvent('desktop-view-change', { detail: { view: nextView } }))
+            requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
           }
           document.querySelectorAll('.desktop-sidebar-item').forEach((item) => {
             const route = item.getAttribute('data-route')
@@ -96,38 +98,48 @@ async function applyDesktopShell(contents) {
             window.__desktopView = 'market'
             document.getElementById('pageNavDashboard')?.click()
             setView('market')
-            setTimeout(syncNavigation, 80)
+            scheduleNavigationSync()
           })
           sidebar.querySelector('[data-route="ai"]')?.addEventListener('click', () => {
             window.__desktopView = 'ai'
             document.getElementById('pageNavDashboard')?.click()
             setView('ai')
-            setTimeout(syncNavigation, 120)
+            scheduleNavigationSync()
           })
           sidebar.querySelector('[data-route="strategy"]')?.addEventListener('click', () => {
             document.getElementById('pageNavStrategy')?.click()
             document.getElementById('pageNavStrategyLocked')?.click()
-            setTimeout(syncNavigation, 120)
+            scheduleNavigationSync()
           })
           sidebar.querySelector('[data-route="account"]')?.addEventListener('click', () => {
             const account = document.getElementById('pageNavAccount')
             if (account) account.click()
             else document.querySelector('.login-entry-btn')?.click()
-            setTimeout(syncNavigation, 120)
+            scheduleNavigationSync()
           })
 
           for (const method of ['pushState', 'replaceState']) {
             const original = history[method]
             history[method] = function (...args) {
               const result = original.apply(this, args)
-              setTimeout(syncNavigation, 0)
+              scheduleNavigationSync()
               return result
             }
           }
-          window.addEventListener('popstate', syncNavigation)
-          const observer = new MutationObserver(() => setTimeout(syncNavigation, 0))
+          window.addEventListener('popstate', scheduleNavigationSync)
+          const observer = new MutationObserver(scheduleNavigationSync)
           observer.observe(page, { childList: true, subtree: true })
           window.__desktopNavigationObserver = observer
+        }
+
+        let syncPending = false
+        function scheduleNavigationSync() {
+          if (syncPending) return
+          syncPending = true
+          requestAnimationFrame(() => {
+            syncPending = false
+            syncNavigation()
+          })
         }
 
         syncNavigation()

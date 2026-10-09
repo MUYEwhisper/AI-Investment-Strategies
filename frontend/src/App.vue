@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AGENT_LIST, DEFAULT_AGENT, PRIMARY_AGENT_ID, type AgentProfile } from './agents'
 import EChartsPie from './components/EChartsPie.vue'
@@ -21,6 +21,7 @@ import { addWatchlistStock, fetchStockDetail, type StockApiPayload } from './ser
 import { fetchUserChats, fetchUserWatchlist, saveUserChats, saveUserWatchlist, type CloudChatSession } from './services/user-data'
 import { useAuthStore } from './stores/auth'
 import { renderMarkdownToHtml } from './utils/markdown'
+import { cancelMotion, enterItem, enterPage, leaveItem, MOTION, playMotion } from './utils/motion'
 
 type Stock = StockApiPayload & {
   id: string
@@ -50,9 +51,6 @@ type ChatSession = {
   messages: ChatMessage[]
 }
 
-const STOCK_TRANSITION_MS = 240
-const LIST_ITEM_ANIM_MS = 220
-const CHAT_SWITCH_MS = 220
 const STORAGE_KEY = 'ai_invest_chat_history'
 const WATCHLIST_STORAGE_KEY = 'ai_invest_watchlist'
 const AI_CHAT_ENDPOINT = (import.meta.env.VITE_AI_CHAT_ENDPOINT as string | undefined) ?? '/chat/endpoint'
@@ -63,9 +61,6 @@ const authStore = useAuthStore()
 authStore.hydrate()
 const authConfig = ref(getKsuserAuthConfig())
 
-const addStockFormRef = ref<HTMLElement | null>(null)
-const watchlistViewRef = ref<HTMLElement | null>(null)
-const stockDetailViewRef = ref<HTMLElement | null>(null)
 const messagesPanelRef = ref<HTMLElement | null>(null)
 
 const stockInput = ref('')
@@ -75,21 +70,13 @@ const isWatchlistRefreshing = ref(false)
 const stockActionHint = ref('')
 const isSectorLoading = ref(false)
 
-const enteringStockId = ref<string | null>(null)
-const leavingStockId = ref<string | null>(null)
-const enteringChatId = ref<string | null>(null)
-const leavingChatId = ref<string | null>(null)
-
 const selectedStockId = ref<string | null>(null)
 const isDetailVisible = ref(false)
-const isStockTransitioning = ref(false)
 
 const chats = ref<ChatSession[]>([])
 const activeChatId = ref<string | null>(null)
 const activeAgentId = ref(PRIMARY_AGENT_ID)
 const isAgentPickerExpanded = ref(true)
-const isChatSwitching = ref(false)
-const bubbleAnimationEnabled = ref(false)
 const isAiResponding = ref(false)
 const useThinking = ref(true)
 const streamHint = ref('')
@@ -111,6 +98,11 @@ const isAccountRoute = computed(() => route.name === 'account')
 const isAuthCallbackRoute = computed(() => route.name === 'auth-callback')
 const isStrategyRoute = computed(() => route.name === 'strategy-workbench')
 const isDashboardRoute = computed(() => route.name === 'dashboard')
+const desktopView = ref<'market' | 'ai' | null>(null)
+function onDesktopViewChange(event: Event): void {
+  const view = (event as CustomEvent).detail?.view
+  if (view === 'market' || view === 'ai') desktopView.value = view
+}
 const hasVisitedStrategy = ref(isStrategyRoute.value)
 const pageTitle = computed(() => {
   if (isAuthCallbackRoute.value) return '正在完成账号登录'
@@ -131,7 +123,8 @@ const pageDescription = computed(() =>
 const activeStageKey = computed(() => {
   if (isAuthCallbackRoute.value) return 'auth-callback'
   if (isAccountRoute.value) return 'account'
-  return 'workspace'
+  if (isStrategyRoute.value) return 'strategy'
+  return 'dashboard'
 })
 const currentUserName = computed(() => authStore.userLabel)
 const currentUserAvatar = computed(() => authStore.userAvatar)
@@ -345,9 +338,12 @@ function formatPrice(value: number | null | undefined): string {
   return typeof value === 'number' ? value.toFixed(2) + ' 元' : '--'
 }
 
-function clearStockAnimClass(el: HTMLElement | null): void {
-  if (!el) return
-  el.classList.remove('view-enter-from-right', 'view-enter-from-left', 'view-exit-to-left', 'view-exit-to-right')
+function enterStock(element: Element, done: () => void): void {
+  const offset = isDetailVisible.value ? 10 : -10
+  playMotion(element, [
+    { opacity: 0, transform: `translateX(${offset}px)` },
+    { opacity: 1, transform: 'translateX(0)' },
+  ], MOTION.normal, done)
 }
 
 async function refreshStockSummary(target: Stock, query = target.code): Promise<void> {
@@ -403,69 +399,16 @@ async function loadStockDetail(target: Stock): Promise<void> {
 }
 
 function showStockDetailById(stockId: string): void {
-  if (isStockTransitioning.value) return
   const stock = watchlist.value.find((item) => item.id === stockId)
   if (!stock) return
 
   selectedStockId.value = stock.id
   void loadStockDetail(stock)
-  isStockTransitioning.value = true
-
-  const addFormEl = addStockFormRef.value
-  const watchlistEl = watchlistViewRef.value
-  const detailEl = stockDetailViewRef.value
-
-  clearStockAnimClass(addFormEl)
-  clearStockAnimClass(watchlistEl)
-  clearStockAnimClass(detailEl)
-
-  addFormEl?.classList.add('view-exit-to-left')
-  watchlistEl?.classList.add('view-exit-to-left')
-
-  window.setTimeout(() => {
-    isDetailVisible.value = true
-
-    nextTick(() => {
-      const nextDetailEl = stockDetailViewRef.value
-      clearStockAnimClass(addStockFormRef.value)
-      clearStockAnimClass(watchlistViewRef.value)
-      clearStockAnimClass(nextDetailEl)
-      nextDetailEl?.classList.add('view-enter-from-right')
-    })
-
-    window.setTimeout(() => {
-      clearStockAnimClass(stockDetailViewRef.value)
-      isStockTransitioning.value = false
-    }, STOCK_TRANSITION_MS)
-  }, STOCK_TRANSITION_MS)
+  isDetailVisible.value = true
 }
 
 function backToWatchlist(): void {
-  if (isStockTransitioning.value) return
-  isStockTransitioning.value = true
-
-  const detailEl = stockDetailViewRef.value
-  clearStockAnimClass(detailEl)
-  detailEl?.classList.add('view-exit-to-right')
-
-  window.setTimeout(() => {
-    isDetailVisible.value = false
-
-    nextTick(() => {
-      const addFormEl = addStockFormRef.value
-      const watchlistEl = watchlistViewRef.value
-      clearStockAnimClass(addFormEl)
-      clearStockAnimClass(watchlistEl)
-      addFormEl?.classList.add('view-enter-from-left')
-      watchlistEl?.classList.add('view-enter-from-left')
-    })
-
-    window.setTimeout(() => {
-      clearStockAnimClass(addStockFormRef.value)
-      clearStockAnimClass(watchlistViewRef.value)
-      isStockTransitioning.value = false
-    }, STOCK_TRANSITION_MS)
-  }, STOCK_TRANSITION_MS)
+  isDetailVisible.value = false
 }
 
 function getScopedStorageKey(baseKey: string): string | null {
@@ -527,22 +470,17 @@ async function addStock(): Promise<void> {
       watchlist.value.splice(existingIndex, 1)
       applyStockPayload(existing, payload)
       watchlist.value.unshift(existing)
-      enteringStockId.value = existing.id
       stockActionHint.value = payload.statusNote
         ? payload.name + ' 已在自选中，已刷新。' + payload.statusNote
         : payload.name + ' 已在自选中，卡片已刷新。'
     } else {
       const newStock = createStockFromPayload(payload)
       watchlist.value.unshift(newStock)
-      enteringStockId.value = newStock.id
       stockActionHint.value = payload.statusNote
         ? payload.name + ' 已加入自选。' + payload.statusNote
         : payload.name + ' 已加入自选。'
     }
     stockInput.value = ''
-    window.setTimeout(() => {
-      if (enteringStockId.value) enteringStockId.value = null
-    }, 320)
   } catch (error) {
     stockActionHint.value = error instanceof Error ? error.message : '股票添加失败'
   } finally {
@@ -560,17 +498,11 @@ function deleteStock(stockId: string): void {
     return
   }
 
-  if (isStockTransitioning.value || leavingStockId.value) return
-  leavingStockId.value = stockId
-
-  window.setTimeout(() => {
-    watchlist.value = watchlist.value.filter((stock) => stock.id !== stockId)
-    if (selectedStockId.value === stockId) {
-      selectedStockId.value = null
-      isDetailVisible.value = false
-    }
-    leavingStockId.value = null
-  }, LIST_ITEM_ANIM_MS)
+  watchlist.value = watchlist.value.filter((stock) => stock.id !== stockId)
+  if (selectedStockId.value === stockId) {
+    selectedStockId.value = null
+    isDetailVisible.value = false
+  }
 }
 
 function currentSectorProbeCodes(): string[] {
@@ -654,8 +586,6 @@ async function persistWatchlist(): Promise<void> {
 async function loadChats(): Promise<void> {
   chats.value = []
   activeChatId.value = null
-  enteringChatId.value = null
-  leavingChatId.value = null
 
   if (isGuestMode.value) {
     activeAgentId.value = PRIMARY_AGENT_ID
@@ -754,8 +684,7 @@ function scrollMessagesToBottom(force = false): void {
   })
 }
 
-function renderMessages(withBubbleAnim = false, forceScroll = false): void {
-  bubbleAnimationEnabled.value = withBubbleAnim
+function renderMessages(forceScroll = false): void {
   scrollMessagesToBottom(forceScroll)
 }
 
@@ -766,29 +695,11 @@ function handleMessagesScroll(): void {
   shouldStickToLatestMessage.value = distanceToBottom <= 24
 }
 
-function transitionToChat(chatId: string, enterChatId: string | null = null, withBubbleAnim = true): void {
-  if (isChatSwitching.value || chatId === activeChatId.value) return
-
-  const panel = messagesPanelRef.value
-  isChatSwitching.value = true
-  panel?.classList.remove('chat-switch-in', 'chat-switch-out')
-  panel?.classList.add('chat-switch-out')
-
-  window.setTimeout(() => {
-    activeChatId.value = chatId
-    enteringChatId.value = enterChatId
-    shouldStickToLatestMessage.value = true
-    renderMessages(withBubbleAnim, true)
-
-    panel?.classList.remove('chat-switch-out')
-    panel?.classList.add('chat-switch-in')
-
-    window.setTimeout(() => {
-      panel?.classList.remove('chat-switch-in')
-      isChatSwitching.value = false
-      enteringChatId.value = null
-    }, CHAT_SWITCH_MS)
-  }, CHAT_SWITCH_MS)
+function transitionToChat(chatId: string): void {
+  if (chatId === activeChatId.value || !getChatById(chatId)) return
+  activeChatId.value = chatId
+  shouldStickToLatestMessage.value = true
+  renderMessages(true)
 }
 
 function createNewChat(withAnim = true, targetAgentId = activeAgentId.value): void {
@@ -805,16 +716,12 @@ function createNewChat(withAnim = true, targetAgentId = activeAgentId.value): vo
 
   if (!activeChatId.value || !withAnim) {
     activeChatId.value = id
-    enteringChatId.value = id
     shouldStickToLatestMessage.value = true
-    renderMessages(withAnim, true)
-    window.setTimeout(() => {
-      if (enteringChatId.value === id) enteringChatId.value = null
-    }, 320)
+    renderMessages(true)
     return
   }
 
-  transitionToChat(id, id, true)
+  transitionToChat(id)
 }
 
 function onNewChatClick(): void {
@@ -838,7 +745,7 @@ function selectAgent(agentId: string): void {
     return
   }
 
-  transitionToChat(existingChat.id, null, true)
+  transitionToChat(existingChat.id)
 }
 
 function toggleAgentPicker(): void {
@@ -852,7 +759,7 @@ function switchChat(chatId: string): void {
   }
 
   if (isAiResponding.value) return
-  transitionToChat(chatId, null, true)
+  transitionToChat(chatId)
 }
 
 function deleteChat(chatId: string): void {
@@ -861,50 +768,18 @@ function deleteChat(chatId: string): void {
     return
   }
 
-  if (isAiResponding.value || isChatSwitching.value || leavingChatId.value) return
-
-  leavingChatId.value = chatId
+  if (isAiResponding.value) return
   const removingActive = chatId === activeChatId.value
-  const panel = messagesPanelRef.value
-
+  chats.value = chats.value.filter((chat) => chat.id !== chatId)
   if (removingActive) {
-    panel?.classList.remove('chat-switch-in', 'chat-switch-out')
-    panel?.classList.add('chat-switch-out')
-  }
-
-  window.setTimeout(() => {
-    chats.value = chats.value.filter((chat) => chat.id !== chatId)
-
-    const currentAgentChats = chats.value.filter((chat) => chat.agentId === activeAgentId.value)
-
-    if (!chats.value.length) {
+    const firstChat = chats.value.find((chat) => chat.agentId === activeAgentId.value)
+    if (firstChat) transitionToChat(firstChat.id)
+    else {
       activeChatId.value = null
-      leavingChatId.value = null
       createNewChat(false, activeAgentId.value)
-      panel?.classList.remove('chat-switch-out')
-      panel?.classList.add('chat-switch-in')
-      window.setTimeout(() => panel?.classList.remove('chat-switch-in'), CHAT_SWITCH_MS)
-      void persistChats()
-      return
     }
-
-    if (removingActive) {
-      const firstChat = currentAgentChats[0]
-      if (firstChat) {
-        activeChatId.value = firstChat.id
-        renderMessages(true)
-        panel?.classList.remove('chat-switch-out')
-        panel?.classList.add('chat-switch-in')
-        window.setTimeout(() => panel?.classList.remove('chat-switch-in'), CHAT_SWITCH_MS)
-      } else {
-        activeChatId.value = null
-        createNewChat(false, activeAgentId.value)
-      }
-    }
-
-    leavingChatId.value = null
-    void persistChats()
-  }, LIST_ITEM_ANIM_MS)
+  }
+  void persistChats()
 }
 
 function getChatById(chatId: string): ChatSession | null {
@@ -1108,7 +983,7 @@ async function sendMessage(): Promise<void> {
   isAiResponding.value = true
   streamHint.value = '正在连接 AI 服务...'
   shouldStickToLatestMessage.value = true
-  renderMessages(false, true)
+  renderMessages(true)
   void persistChats()
 
   try {
@@ -1318,13 +1193,21 @@ watch(
   { immediate: true },
 )
 
+onMounted(() => {
+  window.addEventListener('desktop-view-change', onDesktopViewChange)
+  if (document.documentElement.classList.contains('desktop-shell')) {
+    desktopView.value = document.querySelector('.app-page')?.classList.contains('desktop-view-ai') ? 'ai' : 'market'
+  }
+})
+
 onBeforeUnmount(() => {
+  window.removeEventListener('desktop-view-change', onDesktopViewChange)
   activeAiAbortController?.abort()
 })
 </script>
 
 <template>
-  <div class="app-page">
+  <div class="app-page" :data-desktop-navigation="desktopView ? 'vue' : undefined">
     <div class="app">
       <header class="page-header">
         <div class="page-copy">
@@ -1394,7 +1277,7 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <Transition name="page-shell" mode="out-in">
+      <Transition :css="false" @enter="enterPage" @enter-cancelled="cancelMotion">
         <div :key="activeStageKey" class="page-stage">
           <section v-if="isAuthCallbackRoute" class="panel auth-callback-panel" id="authCallbackPanel">
             <div class="auth-callback-badge" :class="callbackStatus">{{ callbackStatus === 'error' ? '授权失败' : '授权处理中' }}</div>
@@ -1423,9 +1306,9 @@ onBeforeUnmount(() => {
           />
 
           <template v-else>
-            <Transition name="page-shell" mode="out-in">
               <div v-if="!isStrategyRoute" key="workspace-dashboard" class="workspace-stage">
-              <section class="top-grid">
+              <Transition :css="false" @enter="enterPage" @enter-cancelled="cancelMotion">
+              <section v-show="desktopView !== 'ai'" class="top-grid">
         <article class="panel watchlist-wrap" id="watchlistPanel">
           <div class="panel-header">
             <div>
@@ -1450,9 +1333,9 @@ onBeforeUnmount(() => {
           </div>
 
           <template v-else>
+            <Transition :css="false" @enter="enterStock" @enter-cancelled="cancelMotion">
             <div
               v-show="!isDetailVisible"
-              ref="addStockFormRef"
               class="add-stock"
               id="addStockForm"
             >
@@ -1474,16 +1357,15 @@ onBeforeUnmount(() => {
               </button>
               <div v-if="stockActionHint" class="stock-action-hint">{{ stockActionHint }}</div>
             </div>
+            </Transition>
 
-            <div v-show="!isDetailVisible" ref="watchlistViewRef" class="watchlist-view" id="watchlistView">
+            <Transition :css="false" @enter="enterStock" @enter-cancelled="cancelMotion">
+            <TransitionGroup v-show="!isDetailVisible" tag="div" class="watchlist-view" id="watchlistView"
+              :css="false" @enter="enterItem" @leave="leaveItem" @enter-cancelled="cancelMotion" @leave-cancelled="cancelMotion">
               <div
                 v-for="stock in watchlist"
                 :key="stock.id"
                 class="stock-item"
-                :class="{
-                  'list-item-enter': stock.id === enteringStockId,
-                  'list-item-leave': stock.id === leavingStockId,
-                }"
                 @click="showStockDetailById(stock.id)"
               >
                 <div class="stock-item-main">
@@ -1501,11 +1383,12 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
               </div>
-            </div>
+            </TransitionGroup>
+            </Transition>
 
+            <Transition :css="false" @enter="enterStock" @enter-cancelled="cancelMotion">
             <div
               v-show="isDetailVisible && selectedStock"
-              ref="stockDetailViewRef"
               class="stock-detail-view"
               :class="{ active: isDetailVisible }"
               id="stockDetailView"
@@ -1532,6 +1415,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             </div>
+            </Transition>
           </template>
         </article>
         <article class="panel sector-panel">
@@ -1610,8 +1494,10 @@ onBeforeUnmount(() => {
           </div>
         </article>
       </section>
+      </Transition>
 
-      <section class="panel chat-panel">
+      <Transition :css="false" @enter="enterPage" @enter-cancelled="cancelMotion">
+      <section v-show="desktopView !== 'market'" class="panel chat-panel">
         <div class="panel-header">
           <div>
             <div class="panel-title">AI 对话区</div>
@@ -1673,15 +1559,14 @@ onBeforeUnmount(() => {
                 </button>
               </div>
 
-              <div v-if="authStore.isAuthenticated" class="history-list" id="historyList">
+              <TransitionGroup v-if="authStore.isAuthenticated" tag="div" class="history-list" id="historyList"
+                :css="false" @enter="enterItem" @leave="leaveItem" @enter-cancelled="cancelMotion" @leave-cancelled="cancelMotion">
                 <div
                   v-for="chat in activeAgentChats"
                   :key="chat.id"
                   class="history-item"
                   :class="{
                     active: chat.id === activeChatId,
-                    'list-item-enter': chat.id === enteringChatId,
-                    'list-item-leave': chat.id === leavingChatId,
                   }"
                   @click="switchChat(chat.id)"
                 >
@@ -1698,8 +1583,8 @@ onBeforeUnmount(() => {
                     删除
                   </button>
                 </div>
-                <div v-if="!activeAgentChats.length" class="history-empty">当前智能体暂无会话，点击右上角新建开始对话。</div>
-              </div>
+                <div v-if="!activeAgentChats.length" key="empty-history" class="history-empty">当前智能体暂无会话，点击右上角新建开始对话。</div>
+              </TransitionGroup>
               <div v-else class="history-guest-card">
                 <div class="history-guest-title">当前支持直接体验 AI 对话</div>
                 <div class="history-guest-text">游客对话不会保存到账号，登录后可同步历史会话和个人偏好。</div>
@@ -1717,7 +1602,9 @@ onBeforeUnmount(() => {
               </label>
               <span class="status-text">{{ streamHint || (isAiResponding ? '正在生成回复...' : '就绪') }}</span>
             </div>
-            <div ref="messagesPanelRef" class="messages" id="messages" @scroll="handleMessagesScroll">
+            <Transition :css="false" @enter="enterPage" @enter-cancelled="cancelMotion">
+            <div :key="activeChatId || 'empty-chat'" ref="messagesPanelRef" class="messages" id="messages" @scroll="handleMessagesScroll">
+              <TransitionGroup tag="div" class="message-list" :css="false" @enter="enterItem" @enter-cancelled="cancelMotion">
               <div
                 v-for="(msg, idx) in activeChat?.messages ?? []"
                 :key="(activeChat?.id || 'chat') + '_' + idx"
@@ -1725,9 +1612,7 @@ onBeforeUnmount(() => {
                 :class="{
                   user: msg.role === 'user',
                   ai: msg.role === 'ai',
-                  'msg-enter': bubbleAnimationEnabled,
                 }"
-                :style="bubbleAnimationEnabled ? { '--msg-delay': String(Math.min(idx * 36, 220)) + 'ms' } : {}"
               >
                 <div
                   v-if="msg.role === 'ai'"
@@ -1736,7 +1621,9 @@ onBeforeUnmount(() => {
                 ></div>
                 <div v-else class="msg-text">{{ msg.content }}</div>
               </div>
+              </TransitionGroup>
             </div>
+            </Transition>
             <div class="chat-input-wrap">
               <textarea
                 v-model="chatInput"
@@ -1761,6 +1648,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </section>
+      </Transition>
     </div>
               <div v-else key="workspace-strategy" class="workspace-stage">
                 <KeepAlive>
@@ -1771,7 +1659,6 @@ onBeforeUnmount(() => {
                   />
                 </KeepAlive>
               </div>
-            </Transition>
           </template>
         </div>
       </Transition>
@@ -1799,10 +1686,6 @@ onBeforeUnmount(() => {
   --up: #d64545;
   --down: #1f9d62;
   --shadow: 0 12px 26px rgba(9, 41, 93, 0.16);
-  --motion-fast: 0.18s;
-  --motion-normal: 0.24s;
-  --motion-slow: 0.32s;
-  --motion-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 * {
@@ -1976,7 +1859,6 @@ onBeforeUnmount(() => {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.76),
     0 10px 18px rgba(9, 41, 93, 0.16);
-  animation: pageSwitchActivate 0.34s var(--motion-ease);
 }
 
 .page-switch-locked {
@@ -2629,21 +2511,6 @@ onBeforeUnmount(() => {
   overflow-y: auto;
 }
 
-.view-enter-from-right {
-  animation: viewEnterFromRight 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-.view-enter-from-left {
-  animation: viewEnterFromLeft 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-.view-exit-to-left {
-  animation: viewExitToLeft 0.24s ease both;
-}
-
-.view-exit-to-right {
-  animation: viewExitToRight 0.24s ease both;
-}
 
 .stock-detail-view.active {
   display: block;
@@ -3356,13 +3223,6 @@ onBeforeUnmount(() => {
     repeating-linear-gradient(0deg, transparent 0, transparent 26px, rgba(13, 27, 42, 0.02) 27px);
 }
 
-.messages.chat-switch-out {
-  animation: chatSwitchOut 0.22s ease both;
-}
-
-.messages.chat-switch-in {
-  animation: chatSwitchIn 0.24s ease both;
-}
 
 .msg {
   max-width: min(92%, 1180px);
@@ -3483,6 +3343,13 @@ onBeforeUnmount(() => {
   text-decoration: underline;
 }
 
+.message-list {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+}
+
 .msg-markdown .md-table-wrap {
   overflow-x: auto;
   margin: 0 0 0.75em;
@@ -3516,21 +3383,6 @@ onBeforeUnmount(() => {
   background: #f8fbff;
 }
 
-.msg.msg-enter {
-  opacity: 0;
-  transform: translateY(8px);
-  animation: msgEnter 0.28s ease forwards;
-  animation-delay: var(--msg-delay, 0ms);
-}
-
-.list-item-enter {
-  animation: listItemEnter 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-.list-item-leave {
-  pointer-events: none;
-  animation: listItemLeave 0.22s ease both;
-}
 
 .chat-input-wrap {
   border-top: 1px solid var(--line);
@@ -3600,156 +3452,6 @@ onBeforeUnmount(() => {
   }
 }
 
-@keyframes viewEnterFromRight {
-  from {
-    opacity: 0;
-    transform: translateX(20px) scale(0.99);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
-@keyframes viewEnterFromLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-20px) scale(0.99);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
-@keyframes viewExitToLeft {
-  from {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateX(-18px) scale(0.99);
-  }
-}
-
-@keyframes viewExitToRight {
-  from {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateX(18px) scale(0.99);
-  }
-}
-
-@keyframes chatSwitchOut {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-
-@keyframes chatSwitchIn {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes msgEnter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes listItemEnter {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes listItemLeave {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.98);
-  }
-}
-
-@keyframes pageSwitchActivate {
-  0% {
-    transform: scale(0.96);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.76),
-      0 0 0 rgba(9, 41, 93, 0);
-  }
-
-  60% {
-    transform: scale(1.02);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.78),
-      0 14px 24px rgba(9, 41, 93, 0.2);
-  }
-
-  100% {
-    transform: scale(1);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.76),
-      0 10px 18px rgba(9, 41, 93, 0.16);
-  }
-}
-
-.page-shell-enter-active,
-.page-shell-leave-active {
-  transition:
-    opacity 0.28s var(--motion-ease),
-    transform 0.28s var(--motion-ease),
-    filter 0.28s var(--motion-ease);
-}
-
-.page-shell-enter-from {
-  opacity: 0;
-  transform: translateY(16px) scale(0.985);
-  filter: blur(8px);
-}
-
-.page-shell-leave-to {
-  opacity: 0;
-  transform: translateY(-12px) scale(0.99);
-  filter: blur(6px);
-}
 
 @media (max-width: 1100px) {
   .page-header {

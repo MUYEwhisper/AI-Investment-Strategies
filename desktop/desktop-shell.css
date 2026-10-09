@@ -300,11 +300,11 @@
   height: clamp(470px, 58vh, 640px);
 }
 
-.desktop-shell .app-page.desktop-view-market .chat-panel {
+.desktop-shell .app-page.desktop-view-market:not([data-desktop-navigation='vue']) .chat-panel {
   display: none !important;
 }
 
-.desktop-shell .app-page.desktop-view-ai .top-grid {
+.desktop-shell .app-page.desktop-view-ai:not([data-desktop-navigation='vue']) .top-grid {
   display: none !important;
 }
 

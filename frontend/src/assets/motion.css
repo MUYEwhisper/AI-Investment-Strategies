@@ -1,0 +1,18 @@
+:root {
+  --motion-fast: 140ms;
+  --motion-normal: 220ms;
+  --motion-slow: 280ms;
+  --motion-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Keep controls responsive and final states visible when Windows reduces motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

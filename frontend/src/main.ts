@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import './assets/motion.css'
 
 const FORCED_FAVICON_HREF = '/site-icon.png?v=20260419-retouch'
 

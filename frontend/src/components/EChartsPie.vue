@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { MOTION, prefersReducedMotion } from '../utils/motion'
 
 type PieItem = {
   name: string
@@ -36,6 +37,7 @@ const chartRef = ref<HTMLDivElement | null>(null)
 
 let chartInstance: EChartsLike | null = null
 let chartLoadPromise: Promise<void> | null = null
+let resizeObserver: ResizeObserver | null = null
 
 function getEChartsCtor(): EChartsGlobal | null {
   return ((window as Window & { echarts?: EChartsGlobal }).echarts ?? null) as EChartsGlobal | null
@@ -71,7 +73,9 @@ function buildOption(): Record<string, unknown> {
   const radius = props.mode === 'donut' ? ['56%', '78%'] : ['0%', '78%']
 
   return {
-    animationDuration: 400,
+    animation: !prefersReducedMotion(),
+    animationDuration: MOTION.slow,
+    animationDurationUpdate: MOTION.normal,
     tooltip: {
       trigger: 'item',
       confine: true,
@@ -156,7 +160,7 @@ async function initChart(): Promise<void> {
 }
 
 function handleResize(): void {
-  chartInstance?.resize()
+  if (chartRef.value?.clientWidth && chartRef.value.clientHeight) chartInstance?.resize()
 }
 
 watch(
@@ -168,11 +172,16 @@ watch(
 )
 
 onMounted(async () => {
+  if (typeof ResizeObserver !== 'undefined' && chartRef.value) {
+    resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(chartRef.value)
+  }
   await initChart()
   window.addEventListener('resize', handleResize)
 })
 
 onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
   window.removeEventListener('resize', handleResize)
   chartInstance?.dispose()
   chartInstance = null
