@@ -17,15 +17,15 @@ async function main() {
   try {
     const page = await application.firstWindow()
     await expect(page.locator('#watchlistPanel')).toBeVisible({ timeout: 60000 })
-    await expect(page.locator('html.desktop-shell')).toHaveCount(1)
+    await expect(page.locator('.app-page.desktop-view-market')).toHaveCount(1)
     await expect(page.locator('.desktop-sidebar')).toBeVisible()
     await expect(page.locator('.desktop-sidebar-item')).toHaveCount(4)
     await expect(page.locator('#desktopClientDownloadLink')).toBeHidden()
     await expect(page.locator('.login-entry-btn')).toBeVisible()
-    await page.locator('.desktop-sidebar-item[data-route="ai"]').click()
+    await page.locator('.desktop-sidebar-item').filter({ hasText: 'AI 投顾' }).click()
     await expect(page.locator('.chat-panel')).toBeVisible()
     await expect(page.locator('#watchlistPanel')).toBeHidden()
-    await page.locator('.desktop-sidebar-item[data-route="market"]').click()
+    await page.locator('.desktop-sidebar-item').filter({ hasText: '市场总览' }).click()
     await expect(page.locator('#watchlistPanel')).toBeVisible()
     const security = await page.evaluate(() => ({
       nodeUnavailable: typeof window.require === 'undefined' && typeof window.process === 'undefined',
@@ -49,7 +49,7 @@ async function main() {
     await expect(page.locator('body')).toContainText(/登录|Sign in/i, { timeout: 30000 })
     await page.screenshot({ path: path.join(output, 'desktop-signin.png'), fullPage: true })
     if (application.windows().length !== 1) throw new Error('OAuth escaped the main window')
-    console.log(JSON.stringify({ desktop: executablePath ? 'packaged' : 'development', desktopShell: 'injected', downloadLink: 'hidden', security, responses, oauth: 'Ksuser login reached in the same window' }, null, 2))
+    console.log(JSON.stringify({ desktop: executablePath ? 'packaged' : 'development', desktopShell: 'vue-rendered', downloadLink: 'hidden', security, responses, oauth: 'Ksuser login reached in the same window' }, null, 2))
 
     // Simulate a failed network load, then verify the bundled recovery page and retry link.
     await application.evaluate(async ({ BrowserWindow }) => {

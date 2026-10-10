@@ -1,4 +1,4 @@
-/* Desktop-only application chrome. The Vue site remains unchanged in browsers. */
+/* Desktop-only application chrome. Vue renders this layout in the Electron client. */
 :root.desktop-shell,
 :root.desktop-shell body {
   background: #e9eef4 !important;
@@ -300,11 +300,11 @@
   height: clamp(470px, 58vh, 640px);
 }
 
-.desktop-shell .app-page.desktop-view-market:not([data-desktop-navigation='vue']) .chat-panel {
+.desktop-shell .app-page.desktop-view-market .chat-panel {
   display: none !important;
 }
 
-.desktop-shell .app-page.desktop-view-ai:not([data-desktop-navigation='vue']) .top-grid {
+.desktop-shell .app-page.desktop-view-ai .top-grid {
   display: none !important;
 }
 

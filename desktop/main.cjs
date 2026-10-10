@@ -2,153 +2,22 @@ const { app, BrowserWindow, Menu, dialog, shell, screen, session } = require('el
 const path = require('node:path')
 const fs = require('node:fs')
 const { spawn } = require('node:child_process')
-const { SITE_URL, isAppNavigation, isWebsiteNavigation, isExternalLink } = require('./navigation.cjs')
+const { SITE_URL, isAppNavigation, isExternalLink } = require('./navigation.cjs')
 const { readWindowState, saveWindowState } = require('./window-state.cjs')
 
 // A stable profile keeps website sessions and account-scoped local storage across upgrades.
 app.setName('AI Investment Strategies')
 app.setAppUserModelId('cn.muyewhisper.investment')
-if (!app.isPackaged && process.env.AI_INVEST_TEST_PROFILE) {
+if (process.env.AI_INVEST_TEST_PROFILE) {
   app.setPath('userData', path.resolve(process.env.AI_INVEST_TEST_PROFILE))
 }
 
 let mainWindow
 const offlineFile = path.join(__dirname, 'offline.html')
-const desktopShellCssFile = path.join(__dirname, 'desktop-shell.css')
-
-let desktopShellCss
-try {
-  desktopShellCss = fs.readFileSync(desktopShellCssFile, 'utf8')
-} catch {
-  desktopShellCss = ''
-}
-
 async function applyDesktopShell(contents) {
-  if (!desktopShellCss || !isWebsiteNavigation(contents.getURL())) return
-  try {
-    await contents.insertCSS(desktopShellCss)
-    await contents.executeJavaScript(`
-      (() => {
-        const root = document.documentElement
-        const page = document.querySelector('.app-page')
-        const app = page && Array.from(page.children).find((item) => item.classList?.contains('app'))
-        root.classList.add('desktop-shell')
-        document.body?.setAttribute('data-client', 'windows-desktop')
-        document.querySelector('#desktopClientDownloadLink')?.setAttribute('hidden', 'hidden')
-        if (!page || !app) return
-
-        const viewClasses = ['desktop-view-market', 'desktop-view-ai']
-        const setView = (view) => {
-          const nextView = view === 'ai' ? 'ai' : 'market'
-          window.__desktopView = nextView
-          const activeClass = nextView === 'ai' ? 'desktop-view-ai' : 'desktop-view-market'
-          if (!page.classList.contains(activeClass) || viewClasses.some((name) => name !== activeClass && page.classList.contains(name))) {
-            page.classList.remove(...viewClasses)
-            page.classList.add(activeClass)
-            window.dispatchEvent(new CustomEvent('desktop-view-change', { detail: { view: nextView } }))
-            requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
-          }
-          document.querySelectorAll('.desktop-sidebar-item').forEach((item) => {
-            const route = item.getAttribute('data-route')
-            const active = route === nextView && location.pathname === '/'
-            const nextState = active ? 'page' : 'false'
-            if (item.getAttribute('aria-current') !== nextState) item.setAttribute('aria-current', nextState)
-          })
-        }
-
-        const syncNavigation = () => {
-          const path = location.pathname.replace(/\\/+$/, '') || '/'
-          const sidebar = document.querySelector('.desktop-sidebar')
-          if (!sidebar) return
-          const currentView = window.__desktopView === 'ai' ? 'ai' : 'market'
-          const activeRoute = path === '/strategy' ? 'strategy' : path === '/account' ? 'account' : path === '/' ? currentView : ''
-          document.querySelectorAll('.desktop-sidebar-item').forEach((item) => {
-            const nextState = item.getAttribute('data-route') === activeRoute ? 'page' : 'false'
-            if (item.getAttribute('aria-current') !== nextState) item.setAttribute('aria-current', nextState)
-          })
-          if (path === '/') setView(currentView)
-          else page.classList.remove(...viewClasses)
-
-          const status = sidebar.querySelector('[data-desktop-session]')
-          const user = document.querySelector('.user-chip-copy strong')?.textContent?.trim()
-          const nextStatus = user ? user + ' · 云端已连接' : '游客 · 云端已连接'
-          if (status && status.textContent !== nextStatus) status.textContent = nextStatus
-        }
-
-        if (!window.__desktopNavigationInstalled) {
-          window.__desktopNavigationInstalled = true
-          window.__desktopView = 'market'
-          const sidebar = document.createElement('aside')
-          sidebar.className = 'desktop-sidebar'
-          sidebar.setAttribute('aria-label', '桌面工作区导航')
-          sidebar.innerHTML = [
-            '<div class="desktop-sidebar-brand"><strong>智能投资平台</strong><span>云端投资工作台</span></div>',
-            '<div class="desktop-sidebar-section">工作区</div>',
-            '<nav class="desktop-sidebar-nav" aria-label="工作区导航">',
-            '<button class="desktop-sidebar-item" type="button" data-route="market">市场总览</button>',
-            '<button class="desktop-sidebar-item" type="button" data-route="ai">AI 投顾</button>',
-            '<button class="desktop-sidebar-item" type="button" data-route="strategy">策略工作台</button>',
-            '<button class="desktop-sidebar-item" type="button" data-route="account">账号中心</button>',
-            '</nav>',
-            '<div class="desktop-sidebar-foot"><div class="desktop-sidebar-status" data-desktop-session>游客 · 云端已连接</div><div class="desktop-sidebar-version">Windows 64 位客户端</div></div>',
-          ].join('')
-          page.insertBefore(sidebar, app)
-
-          sidebar.querySelector('[data-route="market"]')?.addEventListener('click', () => {
-            window.__desktopView = 'market'
-            document.getElementById('pageNavDashboard')?.click()
-            setView('market')
-            scheduleNavigationSync()
-          })
-          sidebar.querySelector('[data-route="ai"]')?.addEventListener('click', () => {
-            window.__desktopView = 'ai'
-            document.getElementById('pageNavDashboard')?.click()
-            setView('ai')
-            scheduleNavigationSync()
-          })
-          sidebar.querySelector('[data-route="strategy"]')?.addEventListener('click', () => {
-            document.getElementById('pageNavStrategy')?.click()
-            document.getElementById('pageNavStrategyLocked')?.click()
-            scheduleNavigationSync()
-          })
-          sidebar.querySelector('[data-route="account"]')?.addEventListener('click', () => {
-            const account = document.getElementById('pageNavAccount')
-            if (account) account.click()
-            else document.querySelector('.login-entry-btn')?.click()
-            scheduleNavigationSync()
-          })
-
-          for (const method of ['pushState', 'replaceState']) {
-            const original = history[method]
-            history[method] = function (...args) {
-              const result = original.apply(this, args)
-              scheduleNavigationSync()
-              return result
-            }
-          }
-          window.addEventListener('popstate', scheduleNavigationSync)
-          const observer = new MutationObserver(scheduleNavigationSync)
-          observer.observe(page, { childList: true, subtree: true })
-          window.__desktopNavigationObserver = observer
-        }
-
-        let syncPending = false
-        function scheduleNavigationSync() {
-          if (syncPending) return
-          syncPending = true
-          requestAnimationFrame(() => {
-            syncPending = false
-            syncNavigation()
-          })
-        }
-
-        syncNavigation()
-      })()
-    `, true)
-  } catch (error) {
-    if (!app.isPackaged) console.error('Desktop shell injection failed:', error)
-    // Styling is an enhancement; network-backed application functionality remains available.
-  }
+  // Desktop navigation is rendered by Vue from the first frame. Keeping this
+  // hook empty prevents older DOM injection code from creating a second shell.
+  void contents
 }
 
 function openExternal(url) {
@@ -240,6 +109,7 @@ function createWindow() {
       nodeIntegration: false, contextIsolation: true, sandbox: true,
       webSecurity: true, allowRunningInsecureContent: false,
       spellcheck: false, devTools: !app.isPackaged,
+      preload: path.join(__dirname, 'preload.cjs'),
     },
   })
   if (state.maximized) mainWindow.maximize()

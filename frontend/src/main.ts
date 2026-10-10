@@ -4,6 +4,13 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import './assets/motion.css'
+import './assets/desktop-shell.css'
+import { isDesktopClient } from './utils/client'
+
+if (isDesktopClient) {
+  document.documentElement.classList.add('desktop-shell')
+  document.body.dataset.client = 'windows-desktop'
+}
 
 const FORCED_FAVICON_HREF = '/site-icon.png?v=20260419-retouch'
 

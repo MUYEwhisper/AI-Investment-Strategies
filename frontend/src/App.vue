@@ -22,6 +22,7 @@ import { fetchUserChats, fetchUserWatchlist, saveUserChats, saveUserWatchlist, t
 import { useAuthStore } from './stores/auth'
 import { renderMarkdownToHtml } from './utils/markdown'
 import { cancelMotion, enterItem, enterPage, leaveItem, MOTION, playMotion } from './utils/motion'
+import { isDesktopClient } from './utils/client'
 
 type Stock = StockApiPayload & {
   id: string
@@ -98,15 +99,37 @@ const isAccountRoute = computed(() => route.name === 'account')
 const isAuthCallbackRoute = computed(() => route.name === 'auth-callback')
 const isStrategyRoute = computed(() => route.name === 'strategy-workbench')
 const isDashboardRoute = computed(() => route.name === 'dashboard')
-const desktopView = ref<'market' | 'ai' | null>(null)
+const desktopView = ref<'market' | 'ai' | null>(isDesktopClient ? 'market' : null)
+const desktopWorkspaces = [
+  { id: 'market', title: '市场总览' },
+  { id: 'ai', title: 'AI 投顾' },
+  { id: 'strategy', title: '策略工作台' },
+  { id: 'account', title: '账号中心' },
+] as const
+const activeDesktopWorkspace = computed(() => {
+  if (isAccountRoute.value) return 'account'
+  if (isStrategyRoute.value) return 'strategy'
+  return desktopView.value || 'market'
+})
+function navigateDesktop(view: typeof desktopWorkspaces[number]['id']): void {
+  if (view === 'market' || view === 'ai') {
+    desktopView.value = view
+    void router.push('/')
+  } else if (authStore.isAuthenticated) {
+    void router.push(`/${view}`)
+  } else {
+    openSignInDialog(view === 'strategy' ? '登录后可访问策略工作台。' : '登录后可访问账号中心。', `/${view}`)
+  }
+}
 function onDesktopViewChange(event: Event): void {
   const view = (event as CustomEvent).detail?.view
-  if (view === 'market' || view === 'ai') desktopView.value = view
+  if (isDesktopClient && (view === 'market' || view === 'ai')) desktopView.value = view
 }
 const hasVisitedStrategy = ref(isStrategyRoute.value)
 const pageTitle = computed(() => {
   if (isAuthCallbackRoute.value) return '正在完成账号登录'
   if (isAccountRoute.value) return '账号中心'
+  if (isDesktopClient && !isStrategyRoute.value && desktopView.value === 'ai') return 'AI 投顾'
   return isStrategyRoute.value ? '策略工作台' : '市场总览'
 })
 const pageDescription = computed(() =>
@@ -124,7 +147,7 @@ const activeStageKey = computed(() => {
   if (isAuthCallbackRoute.value) return 'auth-callback'
   if (isAccountRoute.value) return 'account'
   if (isStrategyRoute.value) return 'strategy'
-  return 'dashboard'
+  return isDesktopClient ? (desktopView.value || 'market') : 'dashboard'
 })
 const currentUserName = computed(() => authStore.userLabel)
 const currentUserAvatar = computed(() => authStore.userAvatar)
@@ -1193,12 +1216,7 @@ watch(
   { immediate: true },
 )
 
-onMounted(() => {
-  window.addEventListener('desktop-view-change', onDesktopViewChange)
-  if (document.documentElement.classList.contains('desktop-shell')) {
-    desktopView.value = document.querySelector('.app-page')?.classList.contains('desktop-view-ai') ? 'ai' : 'market'
-  }
-})
+onMounted(() => window.addEventListener('desktop-view-change', onDesktopViewChange))
 
 onBeforeUnmount(() => {
   window.removeEventListener('desktop-view-change', onDesktopViewChange)
@@ -1207,7 +1225,32 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-page" :data-desktop-navigation="desktopView ? 'vue' : undefined">
+  <div
+    class="app-page"
+    :class="{
+      'desktop-view-market': isDesktopClient && desktopView === 'market',
+      'desktop-view-ai': isDesktopClient && desktopView === 'ai',
+    }"
+  >
+    <aside v-if="isDesktopClient" class="desktop-sidebar" aria-label="桌面工作区导航">
+      <div class="desktop-sidebar-brand"><strong>智能投资平台</strong><span>云端投资工作台</span></div>
+      <div class="desktop-sidebar-section">工作区</div>
+      <nav class="desktop-sidebar-nav" aria-label="工作区导航">
+        <button
+          v-for="workspace in desktopWorkspaces"
+          :key="workspace.id"
+          class="desktop-sidebar-item"
+          :class="{ 'is-active': activeDesktopWorkspace === workspace.id }"
+          :aria-current="activeDesktopWorkspace === workspace.id ? 'page' : undefined"
+          type="button"
+          @click="navigateDesktop(workspace.id)"
+        >{{ workspace.title }}</button>
+      </nav>
+      <div class="desktop-sidebar-foot">
+        <div class="desktop-sidebar-status" data-desktop-session>{{ authStore.isAuthenticated ? `${currentUserName} · 云端已连接` : '游客 · 云端已连接' }}</div>
+        <div class="desktop-sidebar-version">Windows 64 位客户端</div>
+      </div>
+    </aside>
     <div class="app">
       <header class="page-header">
         <div class="page-copy">
