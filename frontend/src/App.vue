@@ -1358,10 +1358,11 @@ onBeforeUnmount(() => {
           <template v-else>
             <Transition
               v-if="!isStrategyRoute"
-              :css="false"
+              :css="isDesktopClient"
+              :name="isDesktopClient ? 'desktop-workspace' : undefined"
               mode="out-in"
-              @enter="isDesktopClient ? enterWorkspace : enterPage"
-              @leave="isDesktopClient ? leaveWorkspace : undefined"
+              @enter="isDesktopClient ? undefined : enterPage"
+              @leave="isDesktopClient ? undefined : leaveWorkspace"
               @enter-cancelled="cancelMotion"
               @leave-cancelled="cancelMotion"
             >

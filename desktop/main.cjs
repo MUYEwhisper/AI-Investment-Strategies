@@ -39,6 +39,7 @@ async function applyDesktopShell(contents) {
         // Newer website builds render the same shell in Vue. Keep their state
         // and event handlers intact; this fallback only owns older web builds.
         if (page.querySelector('.desktop-sidebar')) return
+        root.classList.add('desktop-legacy-layout')
 
         const viewClasses = ['desktop-view-market', 'desktop-view-ai']
         const setView = (view) => {
