@@ -147,7 +147,7 @@ const activeStageKey = computed(() => {
   if (isAuthCallbackRoute.value) return 'auth-callback'
   if (isAccountRoute.value) return 'account'
   if (isStrategyRoute.value) return 'strategy'
-  return isDesktopClient ? (desktopView.value || 'market') : 'dashboard'
+  return 'dashboard'
 })
 const currentUserName = computed(() => authStore.userLabel)
 const currentUserAvatar = computed(() => authStore.userAvatar)
@@ -1356,7 +1356,16 @@ onBeforeUnmount(() => {
           />
 
           <template v-else>
-              <div v-if="!isStrategyRoute" key="workspace-dashboard" class="workspace-stage">
+            <Transition
+              v-if="!isStrategyRoute"
+              :css="false"
+              mode="out-in"
+              @enter="isDesktopClient ? enterWorkspace : enterPage"
+              @leave="isDesktopClient ? leaveWorkspace : undefined"
+              @enter-cancelled="cancelMotion"
+              @leave-cancelled="cancelMotion"
+            >
+              <div :key="isDesktopClient ? (desktopView || 'market') : 'dashboard'" class="workspace-stage">
               <section v-if="!isDesktopClient || desktopView !== 'ai'" class="top-grid">
         <article class="panel watchlist-wrap" id="watchlistPanel">
           <div class="panel-header">
@@ -1696,6 +1705,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </div>
+            </Transition>
               <div v-else key="workspace-strategy" class="workspace-stage">
                 <KeepAlive>
                   <StrategyWorkbenchPage
