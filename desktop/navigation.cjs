@@ -1,4 +1,6 @@
 const SITE_URL = 'https://www.muyewhisper.cn/'
+const REPOSITORY_URL = 'https://github.com/MUYEwhisper/AI-Investment-Strategies'
+const RELEASES_URL = `${REPOSITORY_URL}/releases/latest`
 const SITE_ORIGINS = new Set([new URL(SITE_URL).origin, 'https://muyewhisper.cn'])
 const APP_ORIGINS = new Set([
   ...SITE_ORIGINS,
@@ -31,4 +33,4 @@ function isExternalLink(value) {
   return Boolean(parseHttpsUrl(value))
 }
 
-module.exports = { SITE_URL, isAppNavigation, isWebsiteNavigation, isExternalLink }
+module.exports = { SITE_URL, REPOSITORY_URL, RELEASES_URL, isAppNavigation, isWebsiteNavigation, isExternalLink }
