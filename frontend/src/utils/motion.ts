@@ -37,6 +37,20 @@ export function enterPage(element: Element, done: () => void): void {
   ], MOTION.normal, done)
 }
 
+export function enterWorkspace(element: Element, done: () => void): void {
+  playMotion(element, [
+    { opacity: 0, transform: 'translateY(14px) scale(0.985)' },
+    { opacity: 1, transform: 'translateY(0) scale(1)' },
+  ], MOTION.slow, done)
+}
+
+export function leaveWorkspace(element: Element, done: () => void): void {
+  playMotion(element, [
+    { opacity: 1, transform: 'translateY(0) scale(1)' },
+    { opacity: 0, transform: 'translateY(-8px) scale(0.995)' },
+  ], MOTION.normal, done)
+}
+
 export function enterItem(element: Element, done: () => void): void {
   playMotion(element, [
     { opacity: 0, transform: 'translateY(5px)' },

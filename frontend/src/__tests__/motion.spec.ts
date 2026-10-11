@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cancelMotion, enterPage } from '../utils/motion'
+import { cancelMotion, enterPage, enterWorkspace, leaveWorkspace } from '../utils/motion'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -19,6 +19,24 @@ function animatedElement() {
 }
 
 describe('motion lifecycle', () => {
+  it('uses the same workspace lifecycle for entering and leaving views', async () => {
+    const { element, animations } = animatedElement()
+    const enterDone = vi.fn()
+    const leaveDone = vi.fn()
+
+    enterWorkspace(element, enterDone)
+    expect(animations).toHaveLength(1)
+    animations[0]!.finish()
+    await Promise.resolve()
+    expect(enterDone).toHaveBeenCalledTimes(1)
+
+    leaveWorkspace(element, leaveDone)
+    expect(animations).toHaveLength(2)
+    animations[1]!.finish()
+    await Promise.resolve()
+    expect(leaveDone).toHaveBeenCalledTimes(1)
+  })
+
   it('does not let a cancelled hook finish the replacement animation', async () => {
     const { element, animations } = animatedElement()
     const firstDone = vi.fn()

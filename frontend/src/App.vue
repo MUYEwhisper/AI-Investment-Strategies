@@ -21,7 +21,7 @@ import { addWatchlistStock, fetchStockDetail, type StockApiPayload } from './ser
 import { fetchUserChats, fetchUserWatchlist, saveUserChats, saveUserWatchlist, type CloudChatSession } from './services/user-data'
 import { useAuthStore } from './stores/auth'
 import { renderMarkdownToHtml } from './utils/markdown'
-import { cancelMotion, enterItem, enterPage, leaveItem, MOTION, playMotion } from './utils/motion'
+import { cancelMotion, enterItem, enterPage, enterWorkspace, leaveItem, leaveWorkspace, MOTION, playMotion } from './utils/motion'
 import { isDesktopClient } from './utils/client'
 
 type Stock = StockApiPayload & {
@@ -1320,7 +1320,14 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <Transition :css="false" @enter="enterPage" @enter-cancelled="cancelMotion">
+      <Transition
+        :css="false"
+        mode="out-in"
+        @enter="enterWorkspace"
+        @leave="leaveWorkspace"
+        @enter-cancelled="cancelMotion"
+        @leave-cancelled="cancelMotion"
+      >
         <div :key="activeStageKey" class="page-stage">
           <section v-if="isAuthCallbackRoute" class="panel auth-callback-panel" id="authCallbackPanel">
             <div class="auth-callback-badge" :class="callbackStatus">{{ callbackStatus === 'error' ? '授权失败' : '授权处理中' }}</div>
@@ -1350,8 +1357,7 @@ onBeforeUnmount(() => {
 
           <template v-else>
               <div v-if="!isStrategyRoute" key="workspace-dashboard" class="workspace-stage">
-              <Transition :css="false" @enter="enterPage" @enter-cancelled="cancelMotion">
-              <section v-show="desktopView !== 'ai'" class="top-grid">
+              <section v-if="!isDesktopClient || desktopView !== 'ai'" class="top-grid">
         <article class="panel watchlist-wrap" id="watchlistPanel">
           <div class="panel-header">
             <div>
@@ -1537,10 +1543,8 @@ onBeforeUnmount(() => {
           </div>
         </article>
       </section>
-      </Transition>
 
-      <Transition :css="false" @enter="enterPage" @enter-cancelled="cancelMotion">
-      <section v-show="desktopView !== 'market'" class="panel chat-panel">
+      <section v-if="!isDesktopClient || desktopView !== 'market'" class="panel chat-panel">
         <div class="panel-header">
           <div>
             <div class="panel-title">AI 对话区</div>
@@ -1691,7 +1695,6 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </section>
-      </Transition>
     </div>
               <div v-else key="workspace-strategy" class="workspace-stage">
                 <KeepAlive>
