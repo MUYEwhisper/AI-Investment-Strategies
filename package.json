@@ -1,7 +1,7 @@
 {
   "name": "ai-investment-strategies",
   "productName": "智能投资平台",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "智能投资平台 Windows 桌面客户端与前后端源码",
   "author": "MUYEwhisper",
   "private": true,
@@ -55,14 +55,13 @@
     ],
     "extraResources": [
       {
-        "from": "desktop/runtime",
+        "from": "desktop/llama-runtime",
         "to": "local-runtime",
         "filter": ["**/*"]
       },
       {
-        "from": "backend/cache/models",
-        "to": "models",
-        "filter": ["**/*"]
+        "from": "backend/cache/models/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
+        "to": "models/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf"
       }
     ],
     "asar": true,

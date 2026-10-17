@@ -180,24 +180,21 @@ function openExternal(url) {
 
 function startLocalModelServer() {
   if (process.env.AI_INVEST_DISABLE_LOCAL_MODEL === '1') return
-  const packagedBackend = path.join(process.resourcesPath || '', 'app.asar.unpacked', 'backend')
-  const backendDir = app.isPackaged && fs.existsSync(path.join(packagedBackend, 'local_server.py'))
-    ? packagedBackend
-    : path.join(__dirname, '..', 'backend')
-  const bundledRuntime = path.join(process.resourcesPath || '', 'local-runtime', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')
-  const bundledModel = path.join(process.resourcesPath || '', 'models', 'deepseek-ai', 'DeepSeek-R1-Distill-Qwen-1.5B')
-  const candidates = process.platform === 'win32'
-    ? [bundledRuntime, path.join(backendDir, '.venv', 'Scripts', 'python.exe'), 'python']
-    : [path.join(backendDir, '.venv', 'bin', 'python'), 'python3', 'python']
-  const python = candidates.find((candidate) => candidate === 'python' || fs.existsSync(candidate))
-  if (!python || !fs.existsSync(path.join(backendDir, 'local_server.py'))) return
-  localModelProcess = spawn(python, ['local_server.py'], {
-    cwd: backendDir,
+  const resourcesDir = process.resourcesPath || path.join(__dirname, '..')
+  const llamaDir = app.isPackaged
+    ? path.join(resourcesDir, 'local-runtime')
+    : path.join(__dirname, '..', 'desktop', 'llama-runtime')
+  const bundledModel = path.join(resourcesDir, 'models', 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf')
+  const llamaServer = path.join(llamaDir, process.platform === 'win32' ? 'llama-server.exe' : 'llama-server')
+  if (!fs.existsSync(llamaServer) || !fs.existsSync(bundledModel)) return
+  localModelProcess = spawn(llamaServer, [
+    '--model', bundledModel, '--host', '127.0.0.1', '--port', '8001',
+    '--ctx-size', '4096', '--threads', String(Math.max(2, Math.min(8, Number.parseInt(process.env.LOCAL_MODEL_THREADS || '4', 10)))),
+    '--reasoning', 'off',
+  ], {
+    cwd: llamaDir,
     env: {
       ...process.env,
-      LOCAL_MODEL_PORT: '8001',
-      LOCAL_MODEL_CACHE: path.join(app.getPath('userData'), 'models'),
-      ...(fs.existsSync(path.join(bundledModel, 'config.json')) ? { LOCAL_MODEL_PATH: bundledModel } : {}),
     },
     stdio: app.isPackaged ? 'ignore' : 'pipe',
     windowsHide: true,

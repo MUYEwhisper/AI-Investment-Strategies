@@ -7,7 +7,7 @@ async function main() {
   const root = path.resolve(__dirname, '..')
   const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'ai-invest-local-smoke-'))
   const executablePath = process.argv[2] ? path.resolve(process.argv[2]) : undefined
-  const env = { ...process.env, AI_INVEST_TEST_PROFILE: profile, AI_INVEST_DISABLE_LOCAL_MODEL: '1' }
+  const env = { ...process.env, AI_INVEST_TEST_PROFILE: profile }
   delete env.ELECTRON_RUN_AS_NODE
   const application = await electron.launch({
     ...(executablePath ? { executablePath, args: [] } : { args: [root] }), env, timeout: 60000,
@@ -21,6 +21,7 @@ async function main() {
     await expect(page.locator('h1')).toHaveText('本地智投问答')
     await expect(page.locator('#composer')).toBeVisible()
     await expect(page.locator('#input')).toBeVisible()
+    await expect.poll(async () => page.evaluate(async () => (await fetch('http://127.0.0.1:8001/health')).json()), { timeout: 60000 }).toMatchObject({ status: 'ok' })
     await page.locator('#back').click()
     await expect.poll(() => page.url(), { timeout: 60000 }).toBe('https://www.muyewhisper.cn/')
     console.log(JSON.stringify({ localAssistant: 'bundled-page', navigation: 'passed', composer: 'visible' }))
