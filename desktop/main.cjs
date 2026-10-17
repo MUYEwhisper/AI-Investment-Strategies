@@ -15,6 +15,7 @@ if (process.env.AI_INVEST_TEST_PROFILE) {
 let mainWindow
 let localModelProcess
 const offlineFile = path.join(__dirname, 'offline.html')
+const localAiFile = path.join(__dirname, 'local-ai.html')
 const desktopShellCssFile = path.join(__dirname, '..', 'frontend', 'src', 'assets', 'desktop-shell.css')
 
 let desktopShellCss
@@ -37,9 +38,8 @@ async function applyDesktopShell(contents) {
         document.body?.setAttribute('data-client', 'windows-desktop')
         document.querySelector('#desktopClientDownloadLink')?.setAttribute('hidden', 'hidden')
         if (!page || !app) return
-        // Newer website builds render the same shell in Vue. Keep their state
-        // and event handlers intact; this fallback only owns older web builds.
-        if (page.querySelector('.desktop-sidebar')) return
+        // Newer website builds render part of the shell in Vue. Keep their state
+        // and event handlers intact, but still add the local assistant entry.
         root.classList.add('desktop-legacy-layout')
 
         const viewClasses = ['desktop-view-market', 'desktop-view-ai']
@@ -109,7 +109,7 @@ async function applyDesktopShell(contents) {
             scheduleNavigationSync()
           })
           sidebar.querySelector('[data-route="local-ai"]')?.addEventListener('click', () => {
-            window.location.assign('/local-ai')
+            window.aiInvestmentDesktop?.openLocalAi?.()
           })
           sidebar.querySelector('[data-route="strategy"]')?.addEventListener('click', () => {
             document.getElementById('pageNavStrategy')?.click()
@@ -122,6 +122,21 @@ async function applyDesktopShell(contents) {
             else document.querySelector('.login-entry-btn')?.click()
             scheduleNavigationSync()
           })
+        }
+
+        let localItem = sidebar.querySelector('[data-route="local-ai"]')
+        if (!localItem) {
+          const nav = sidebar.querySelector('.desktop-sidebar-nav') || sidebar
+          localItem = document.createElement('button')
+          localItem.className = 'desktop-sidebar-item'
+          localItem.type = 'button'
+          localItem.dataset.route = 'local-ai'
+          localItem.textContent = '本地智投'
+          nav.appendChild(localItem)
+        }
+        if (!localItem.dataset.localAiHandler) {
+          localItem.dataset.localAiHandler = 'installed'
+          localItem.addEventListener('click', () => window.aiInvestmentDesktop?.openLocalAi?.())
         }
 
         if (!window.__desktopNavigationInstalled) {
@@ -169,7 +184,7 @@ function startLocalModelServer() {
   const backendDir = app.isPackaged && fs.existsSync(path.join(packagedBackend, 'local_server.py'))
     ? packagedBackend
     : path.join(__dirname, '..', 'backend')
-  const bundledRuntime = path.join(process.resourcesPath || '', 'local-runtime', process.platform === 'win32' ? 'python.exe' : 'bin/python')
+  const bundledRuntime = path.join(process.resourcesPath || '', 'local-runtime', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')
   const bundledModel = path.join(process.resourcesPath || '', 'models', 'deepseek-ai', 'DeepSeek-R1-Distill-Qwen-1.5B')
   const candidates = process.platform === 'win32'
     ? [bundledRuntime, path.join(backendDir, '.venv', 'Scripts', 'python.exe'), 'python']
@@ -293,6 +308,10 @@ function createWindow() {
   mainWindow.on('close', () => saveWindowState(stateFile, mainWindow))
   mainWindow.on('closed', () => { mainWindow = null })
   const contents = mainWindow.webContents
+  contents.on('ipc-message', (_event, channel) => {
+    if (channel === 'open-local-ai') void mainWindow.loadFile(localAiFile)
+    if (channel === 'open-website') void goHome()
+  })
   contents.on('will-attach-webview', (event) => event.preventDefault())
   contents.on('will-navigate', (event, url) => {
     if (!isAppNavigation(url)) {

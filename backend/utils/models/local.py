@@ -35,12 +35,7 @@ def load_model() -> tuple[Any, Any]:
 
             path = _model_path()
             if not os.path.isdir(path):
-                from modelscope import snapshot_download
-
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                snapshot_download(MODEL_ID, cache_dir=os.path.dirname(os.path.dirname(path)))
-            if not os.path.isdir(path):
-                raise FileNotFoundError(f"本地模型权重目录不存在：{path}")
+                raise FileNotFoundError(f"安装包未包含本地模型权重：{path}")
             tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
             kwargs: dict[str, Any] = {"trust_remote_code": True, "device_map": "auto"}
             kwargs["dtype"] = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -59,7 +54,7 @@ def status() -> dict[str, Any]:
     if _TOKENIZER is not None and _MODEL is not None:
         return {"modelReady": True, "model": MODEL_ID, "modelPath": _model_path()}
     installed = os.path.isfile(os.path.join(_model_path(), "config.json"))
-    return {"modelReady": installed, "modelInstalled": installed, "model": MODEL_ID, "modelPath": _model_path(), "message": _LOAD_ERROR or ("本地模型权重已安装，首次推理时加载" if installed else "本地模型未安装，首次推理将从 ModelScope 下载约 3.55 GB 权重")}
+    return {"modelReady": installed, "modelInstalled": installed, "model": MODEL_ID, "modelPath": _model_path(), "message": _LOAD_ERROR or ("本地模型权重已安装，首次推理时加载" if installed else "安装包未包含本地模型权重，请重新安装最新版本")}
 
 
 def _mcp_context(mcp_context: Any) -> str:
@@ -80,16 +75,17 @@ def generate(prompt: str, system_prompt: str = "", history: list[dict[str, str]]
     tokenizer, model = load_model()
     messages = _messages(prompt, system_prompt, history or [], mcp_context)
     if hasattr(tokenizer, "apply_chat_template"):
-        encoded = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
+        encoded = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
         model_device = getattr(model, "device", None)
         if model_device is not None:
-            encoded = encoded.to(model_device)
+            encoded = {key: value.to(model_device) for key, value in encoded.items()}
     else:
-        encoded = tokenizer("\n".join(f"{m['role']}: {m['content']}" for m in messages), return_tensors="pt").to(model.device)
-    input_length = encoded.shape[-1]
+        encoded = tokenizer("\n".join(f"{m['role']}: {m['content']}" for m in messages), return_tensors="pt")
+        encoded = {key: value.to(model.device) for key, value in encoded.items()}
+    input_length = encoded["input_ids"].shape[-1]
     import torch
     with torch.no_grad():
-        output = model.generate(encoded, max_new_tokens=int(os.environ.get("LOCAL_MODEL_MAX_NEW_TOKENS", "512")), do_sample=True, temperature=0.6, top_p=0.9, pad_token_id=tokenizer.eos_token_id)
+        output = model.generate(**encoded, max_new_tokens=int(os.environ.get("LOCAL_MODEL_MAX_NEW_TOKENS", "512")), do_sample=True, temperature=0.6, top_p=0.9, pad_token_id=tokenizer.eos_token_id)
     text = tokenizer.decode(output[0][input_length:], skip_special_tokens=True).strip()
     for index in range(0, len(text), 24):
         yield text[index:index + 24]

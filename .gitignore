@@ -18,6 +18,9 @@ test-results/
 playwright-report/
 .desktop-test/
 .tmp-*
+desktop/runtime-v/
+desktop/runtime/
+.tmp-runtime/
 *.bak
 *.bak_*
 .DS_Store

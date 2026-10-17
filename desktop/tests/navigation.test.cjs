@@ -1,6 +1,8 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { isAppNavigation, isWebsiteNavigation, isExternalLink } = require('../navigation.cjs')
+const fs = require('node:fs')
+const path = require('node:path')
 
 test('registered OAuth origins and callback stay inside the app', () => {
   for (const url of [
@@ -33,4 +35,11 @@ test('untrusted origins and privileged URL schemes cannot enter the app', () => 
   assert.equal(isExternalLink('https://github.com/MUYEwhisper/AI-Investment-Strategies'), true)
   assert.equal(isExternalLink('file:///C:/Windows/system.ini'), false)
   assert.equal(isExternalLink('javascript:alert(1)'), false)
+})
+
+test('the local assistant is bundled as an app page instead of a remote route', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.cjs'), 'utf8')
+  assert.equal(fs.existsSync(path.join(__dirname, '..', 'local-ai.html')), true)
+  assert.match(main, /loadFile\(localAiFile\)/)
+  assert.doesNotMatch(main, /window\.location\.assign\('\/local-ai'\)/)
 })

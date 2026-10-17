@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src http://127.0.0.1:8001 https://www.muyewhisper.cn https://muyewhisper.cn; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+  <title>本地智投</title>
+  <style>
+    :root { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; color: #172b3a; background: #f1f5f9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    .shell { min-height: 100vh; display: flex; flex-direction: column; }
+    header { height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; background: #fff; border-bottom: 1px solid #dbe5ed; }
+    .brand { font-size: 20px; font-weight: 700; } .sub { color: #718193; font-size: 12px; margin-top: 4px; }
+    button { border: 1px solid #c4d2df; border-radius: 6px; background: #fff; color: #25465d; padding: 9px 14px; cursor: pointer; font: inherit; }
+    button.primary { color: #fff; background: #256b91; border-color: #256b91; } button:disabled { opacity: .55; cursor: default; }
+    main { width: min(1040px, calc(100% - 48px)); flex: 1; margin: 24px auto; display: flex; }
+    .panel { display: flex; flex: 1; min-height: calc(100vh - 144px); flex-direction: column; background: #fff; border: 1px solid #dbe5ed; border-radius: 8px; overflow: hidden; }
+    .panel-head { padding: 22px 24px 16px; display: flex; justify-content: space-between; align-items: start; border-bottom: 1px solid #e6edf2; }
+    h1 { margin: 0; font-size: 22px; } .model { color: #718193; font-size: 13px; margin-top: 6px; }
+    .status { font-size: 13px; padding: 5px 9px; border: 1px solid #c9d7e5; border-radius: 4px; color: #718193; } .status.ready { color: #27754d; background: #f2fbf5; border-color: #9bd5b6; } .status.error { color: #a33e3e; background: #fff7f7; border-color: #e2b4b4; }
+    .messages { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 22px 24px; overflow: auto; }
+    .message, .empty { max-width: min(800px, 88%); padding: 12px 15px; border: 1px solid #dbe5ed; border-radius: 6px; white-space: pre-wrap; line-height: 1.65; } .message.user { align-self: flex-end; background: #edf4f9; border-color: #bfd4e6; } .message.ai, .empty { align-self: flex-start; } .empty { color: #718193; }
+    form { display: flex; align-items: end; gap: 12px; padding: 16px 24px; border-top: 1px solid #e6edf2; } textarea { flex: 1; min-height: 58px; max-height: 180px; resize: vertical; padding: 11px; border: 1px solid #c4d2df; border-radius: 6px; font: inherit; line-height: 1.5; } .error { padding: 0 24px 15px; color: #a33e3e; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header><div><div class="brand">智能投资平台</div><div class="sub">本地智投 · 仅保留智投问答</div></div><button id="back">返回云端工作台</button></header>
+    <main><section class="panel"><div class="panel-head"><div><h1>本地智投问答</h1><div class="model">DeepSeek-R1-Distill-Qwen-1.5B · 本机推理 · 与云端使用同一 MCP 数据源</div></div><span id="status" class="status">检查本地模型</span></div><div id="messages" class="messages"><div class="empty">你好，我是本地智投问答。提出投资问题后，我会在本机运行模型，并按需查询投资 MCP 数据。</div></div><form id="composer"><textarea id="input" placeholder="输入投资相关问题" aria-label="投资问题"></textarea><button id="send" class="primary" type="submit">发送</button></form><div id="error" class="error" hidden></div></section></main>
+  </div>
+  <script>
+    const SITE = 'https://www.muyewhisper.cn'
+    const state = { messages: [], busy: false }
+    const $ = (id) => document.getElementById(id)
+    const status = (text, kind = '') => { $('status').textContent = text; $('status').className = 'status ' + kind }
+    const showError = (text) => { $('error').textContent = text; $('error').hidden = !text }
+    const addMessage = (role, content) => { const node = document.createElement('div'); node.className = 'message ' + role; node.textContent = content; $('messages').appendChild(node); $('messages').scrollTop = $('messages').scrollHeight; return node }
+    async function checkHealth() { try { const response = await fetch('http://127.0.0.1:8001/health'); const data = await response.json(); if (data.modelReady) status('本机模型就绪', 'ready'); else status('模型资源未就绪', 'error'); showError(data.message || '') } catch { status('本地服务未启动', 'error'); showError('本地模型服务未启动。请重新启动桌面客户端。') } }
+    async function send(event) {
+      event.preventDefault(); const prompt = $('input').value.trim(); if (!prompt || state.busy) return
+      state.busy = true; $('input').value = ''; $('send').disabled = true; showError(''); addMessage('user', prompt); const answer = addMessage('ai', ''); status('本机推理中')
+      try {
+        let mcpContext = []
+        try { const context = await fetch(SITE + '/chat/local-context', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) }); if (context.ok) mcpContext = (await context.json()).records || [] } catch { /* MCP is optional for general questions. */ }
+        const response = await fetch('http://127.0.0.1:8001/chat/local/endpoint', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ originalPrompt: prompt, messages: state.messages.slice(-8), mcpContext }) })
+        if (!response.ok || !response.body) throw new Error('本地模型服务请求失败。')
+        const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ''
+        while (true) { const chunk = await reader.read(); if (chunk.done) break; buffer += decoder.decode(chunk.value, { stream: true }); const events = buffer.split('\n\n'); buffer = events.pop() || ''; for (const eventText of events) { const dataLine = eventText.split('\n').find((line) => line.startsWith('data: ')); if (!dataLine) continue; const data = JSON.parse(dataLine.slice(6)); if (data.content) { answer.textContent += data.content; $('messages').scrollTop = $('messages').scrollHeight } if (data.message) showError(data.message) } }
+        state.messages.push({ role: 'user', content: prompt }, { role: 'assistant', content: answer.textContent }); status('本机模型就绪', 'ready')
+      } catch (error) { answer.remove(); showError(error instanceof Error ? error.message : '本地模型请求失败。'); status('模型不可用', 'error') } finally { state.busy = false; $('send').disabled = false; $('input').focus() }
+    }
+    $('back').addEventListener('click', () => window.aiInvestmentDesktop?.openWebsite?.()); $('composer').addEventListener('submit', send); $('input').addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); $('composer').requestSubmit() } }); checkHealth()
+  </script>
+</body>
+</html>

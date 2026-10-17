@@ -19,7 +19,7 @@ async function main() {
     await expect(page.locator('#watchlistPanel')).toBeVisible({ timeout: 60000 })
     await expect(page.locator('.app-page.desktop-view-market')).toHaveCount(1)
     await expect(page.locator('.desktop-sidebar')).toBeVisible()
-    await expect(page.locator('.desktop-sidebar-item')).toHaveCount(4)
+    await expect(page.locator('.desktop-sidebar-item')).toHaveCount(5)
     await expect(page.locator('#desktopClientDownloadLink')).toBeHidden()
     await expect(page.locator('.login-entry-btn')).toBeVisible()
     await page.locator('.desktop-sidebar-item').filter({ hasText: 'AI 投顾' }).click()
@@ -27,6 +27,11 @@ async function main() {
     await expect(page.locator('#watchlistPanel')).toBeHidden()
     await page.locator('.desktop-sidebar-item').filter({ hasText: '市场总览' }).click()
     await expect(page.locator('#watchlistPanel')).toBeVisible()
+    await page.locator('.desktop-sidebar-item').filter({ hasText: '本地智投' }).click()
+    await expect(page.locator('h1')).toHaveText('本地智投问答')
+    await expect(page.locator('#composer')).toBeVisible()
+    await page.locator('#back').click()
+    await expect(page.locator('#watchlistPanel')).toBeVisible({ timeout: 60000 })
     const security = await page.evaluate(() => ({
       nodeUnavailable: typeof window.require === 'undefined' && typeof window.process === 'undefined',
       origin: window.location.origin,
