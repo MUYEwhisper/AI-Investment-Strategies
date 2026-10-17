@@ -199,6 +199,91 @@
   display: none !important;
 }
 
+.desktop-shell .local-ai-workspace {
+  min-height: calc(100vh - 122px);
+}
+
+.desktop-shell .local-ai-chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 122px);
+}
+
+.desktop-shell .local-ai-chat-panel .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.desktop-shell .local-model-status {
+  padding: 5px 9px;
+  border: 1px solid #c9d7e5;
+  border-radius: 999px;
+  color: #536b83;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.desktop-shell .local-model-status.ready { border-color: #9bd5b6; color: #27754d; background: #f2fbf5; }
+.desktop-shell .local-model-status.loading { border-color: #9bc8e7; color: #17649c; background: #eef7ff; }
+.desktop-shell .local-model-status.unavailable { border-color: #e2b4b4; color: #a33e3e; background: #fff7f7; }
+
+.desktop-shell .local-ai-messages {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 18px;
+  overflow-y: auto;
+  background: #f8fafc;
+}
+
+.desktop-shell .local-ai-message,
+.desktop-shell .local-ai-empty {
+  max-width: min(820px, 86%);
+  padding: 11px 14px;
+  border: 1px solid var(--desktop-line);
+  border-radius: 8px;
+  color: var(--desktop-ink);
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.desktop-shell .local-ai-message.user { align-self: flex-end; background: #edf4f9; border-color: #bfd4e6; }
+.desktop-shell .local-ai-message.ai { align-self: flex-start; background: #fff; }
+.desktop-shell .local-ai-empty { align-self: flex-start; color: var(--desktop-muted); background: #fff; }
+
+.desktop-shell .local-ai-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--desktop-line);
+  background: #fff;
+}
+
+.desktop-shell .local-ai-composer textarea {
+  flex: 1;
+  min-height: 56px;
+  max-height: 180px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #ccd9e5;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--desktop-ink);
+  font: inherit;
+}
+
+.desktop-shell .local-ai-error {
+  padding: 0 14px 14px;
+  color: #a33e3e;
+  font-size: 12px;
+  background: #fff;
+}
+
 .desktop-shell .guest-chip,
 .desktop-shell .user-chip,
 .desktop-shell .user-toolbar .btn,

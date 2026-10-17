@@ -13,9 +13,13 @@
 
 ## 直接使用 Windows 应用
 
-运行 [GitHub Releases](https://github.com/MUYEwhisper/AI-Investment-Strategies/releases/latest) 中最新的 `AI-Investment-Strategies-Setup-1.0.13-x64.exe`，按安装程序提示安装。应用需要网络连接；登录、聊天、行情和账户数据均由服务器处理。安装器不会写入密钥，登录会话保存在 Electron 的应用用户数据目录中。安装程序同时注册 Windows 卸载程序，应用菜单也提供官网、GitHub 仓库和卸载入口。
+运行 [GitHub Releases](https://github.com/MUYEwhisper/AI-Investment-Strategies/releases/latest) 中最新的 `AI-Investment-Strategies-Setup-1.0.14-x64.exe`，按安装程序提示安装。应用需要网络连接；登录、聊天、行情和账户数据均由服务器处理。安装器不会写入密钥，登录会话保存在 Electron 的应用用户数据目录中。安装程序同时注册 Windows 卸载程序，应用菜单也提供官网、GitHub 仓库和卸载入口。
 
 当前桌面客户端加载 `https://www.muyewhisper.cn/`。如果服务器暂时不可达，应用会显示重连页面，点击“重新连接”或按 `Ctrl + R` 即可恢复。
+
+桌面端工作区新增“本地智投”。该页只保留“智投问答”，使用 ModelScope 的 `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` 在本机推理；股票、市场和新闻数据通过与云端模型相同的今日投资 MCP 服务取得。模型权重约 3.55 GB，首次本地问答会按需下载到 Electron 用户数据目录的 `models/` 下，后续离线推理不需要再次下载。开发环境可先运行 `npm run local-model:download` 下载到 `backend/cache/models/`。
+
+本地模型服务使用 `backend/local_server.py`，桌面开发时需要 `backend/.venv` 或系统 `python`，并安装 `backend/requirements.txt`。正式安装包会包含本地服务源码和 MCP 工具定义；发布安装包时应将 Python 运行时放入 `desktop/runtime/`，或在目标机器预装 Python，安装程序不会把 3.55 GB 权重强制写入安装包。
 
 桌面客户端由 Vue 首帧直接渲染独立的桌面应用壳：使用左侧工作区导航栏，将市场总览、AI 投顾、策略工作台和账号中心分开显示，并配合紧凑卡片与 Windows 风格控件。旧网页导航和旧桌面注入层已移除，下载入口只在网站端显示，桌面端会自动隐藏；所有股票、板块、AI 对话、登录和策略工作台功能仍使用同一套线上页面与服务器接口。
 

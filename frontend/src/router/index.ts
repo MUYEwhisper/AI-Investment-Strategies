@@ -42,6 +42,12 @@ const router = createRouter({
       },
     },
     {
+      path: '/local-ai',
+      name: 'local-ai',
+      component: EmptyRouteView,
+      meta: { desktopOnly: true },
+    },
+    {
       path: '/account',
       name: 'account',
       component: EmptyRouteView,
@@ -75,6 +81,8 @@ router.beforeEach((to) => {
       query,
     }
   }
+
+  if (to.meta.desktopOnly && !window.aiInvestmentDesktop) return '/'
 
   if (requiresAuth && !session) {
     return {

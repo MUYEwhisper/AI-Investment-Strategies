@@ -6,8 +6,31 @@ from flask import Blueprint, Response, jsonify, request
 
 from utils.auth.context import get_current_user_id, try_auth_from_request
 from utils.models.deepseek import chat
+import utils.mcp.init as mcp
+import re
 
 chat_page = Blueprint("chat", __name__)
+
+
+@chat_page.post("/local-context")
+def local_context_endpoint():
+    data = request.get_json(silent=True) or {}
+    prompt = str(data.get("prompt") or "")
+    codes = list(dict.fromkeys(re.findall(r"(?<!\d)(?:[603]\d{5})(?!\d)", prompt)))[:3]
+    records = []
+    requested = []
+    for code in codes:
+        requested.append(("get_stock_realtime_quote", {"stockCode": code}))
+    if any(term in prompt for term in ("市场", "大盘", "行情", "指数", "板块", "情绪")):
+        requested.append(("get_market_change_ratio_status", {}))
+    if any(term in prompt for term in ("新闻", "消息", "公告", "政策", "最近", "今日")):
+        requested.append(("list_news", {"pageNum": 1, "pageSize": 10}))
+    for name, arguments in requested:
+        try:
+            records.append({"tool": name, "arguments": arguments, "result": mcp.tool_call(name, arguments)})
+        except Exception as exc:
+            records.append({"tool": name, "arguments": arguments, "error": str(exc)})
+    return jsonify({"success": True, "records": records, "source": "今日投资 MCP"})
 
 
 def _build_chat_payload() -> tuple[dict[str, object] | None, tuple[dict[str, str], int] | None]:

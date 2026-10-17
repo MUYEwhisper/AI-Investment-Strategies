@@ -13,6 +13,7 @@ if (process.env.AI_INVEST_TEST_PROFILE) {
 }
 
 let mainWindow
+let localModelProcess
 const offlineFile = path.join(__dirname, 'offline.html')
 const desktopShellCssFile = path.join(__dirname, '..', 'frontend', 'src', 'assets', 'desktop-shell.css')
 
@@ -57,6 +58,8 @@ async function applyDesktopShell(contents) {
           const currentView = window.__desktopView === 'ai' ? 'ai' : 'market'
           const activeRoute = currentPath === '/strategy'
             ? 'strategy'
+            : currentPath === '/local-ai'
+              ? 'local-ai'
             : currentPath === '/account'
               ? 'account'
               : currentPath === '/'
@@ -85,6 +88,7 @@ async function applyDesktopShell(contents) {
             '<nav class="desktop-sidebar-nav" aria-label="工作区导航">',
             '<button class="desktop-sidebar-item" type="button" data-route="market">市场总览</button>',
             '<button class="desktop-sidebar-item" type="button" data-route="ai">AI 投顾</button>',
+            '<button class="desktop-sidebar-item" type="button" data-route="local-ai">本地智投</button>',
             '<button class="desktop-sidebar-item" type="button" data-route="strategy">策略工作台</button>',
             '<button class="desktop-sidebar-item" type="button" data-route="account">账号中心</button>',
             '</nav>',
@@ -103,6 +107,9 @@ async function applyDesktopShell(contents) {
             document.getElementById('pageNavDashboard')?.click()
             setView('ai')
             scheduleNavigationSync()
+          })
+          sidebar.querySelector('[data-route="local-ai"]')?.addEventListener('click', () => {
+            window.location.assign('/local-ai')
           })
           sidebar.querySelector('[data-route="strategy"]')?.addEventListener('click', () => {
             document.getElementById('pageNavStrategy')?.click()
@@ -154,6 +161,42 @@ async function applyDesktopShell(contents) {
 
 function openExternal(url) {
   if (isExternalLink(url)) void shell.openExternal(url).catch(() => {})
+}
+
+function startLocalModelServer() {
+  if (process.env.AI_INVEST_DISABLE_LOCAL_MODEL === '1') return
+  const packagedBackend = path.join(process.resourcesPath || '', 'app.asar.unpacked', 'backend')
+  const backendDir = app.isPackaged && fs.existsSync(path.join(packagedBackend, 'local_server.py'))
+    ? packagedBackend
+    : path.join(__dirname, '..', 'backend')
+  const bundledRuntime = path.join(process.resourcesPath || '', 'local-runtime', process.platform === 'win32' ? 'python.exe' : 'bin/python')
+  const bundledModel = path.join(process.resourcesPath || '', 'models', 'deepseek-ai', 'DeepSeek-R1-Distill-Qwen-1.5B')
+  const candidates = process.platform === 'win32'
+    ? [bundledRuntime, path.join(backendDir, '.venv', 'Scripts', 'python.exe'), 'python']
+    : [path.join(backendDir, '.venv', 'bin', 'python'), 'python3', 'python']
+  const python = candidates.find((candidate) => candidate === 'python' || fs.existsSync(candidate))
+  if (!python || !fs.existsSync(path.join(backendDir, 'local_server.py'))) return
+  localModelProcess = spawn(python, ['local_server.py'], {
+    cwd: backendDir,
+    env: {
+      ...process.env,
+      LOCAL_MODEL_PORT: '8001',
+      LOCAL_MODEL_CACHE: path.join(app.getPath('userData'), 'models'),
+      ...(fs.existsSync(path.join(bundledModel, 'config.json')) ? { LOCAL_MODEL_PATH: bundledModel } : {}),
+    },
+    stdio: app.isPackaged ? 'ignore' : 'pipe',
+    windowsHide: true,
+  })
+  localModelProcess.on('error', (error) => {
+    if (!app.isPackaged) console.error('Local model server failed to start:', error)
+  })
+  localModelProcess.on('exit', () => { localModelProcess = undefined })
+}
+
+function stopLocalModelServer() {
+  if (!localModelProcess || localModelProcess.killed) return
+  localModelProcess.kill()
+  localModelProcess = undefined
 }
 
 function launchUninstaller() {
@@ -296,7 +339,9 @@ if (!app.requestSingleInstanceLock()) {
       })
     })
     createWindow()
+    startLocalModelServer()
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
   })
+  app.on('before-quit', stopLocalModelServer)
   app.on('window-all-closed', () => app.quit())
 }

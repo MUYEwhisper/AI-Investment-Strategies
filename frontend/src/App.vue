@@ -55,6 +55,7 @@ type ChatSession = {
 const STORAGE_KEY = 'ai_invest_chat_history'
 const WATCHLIST_STORAGE_KEY = 'ai_invest_watchlist'
 const AI_CHAT_ENDPOINT = (import.meta.env.VITE_AI_CHAT_ENDPOINT as string | undefined) ?? '/chat/endpoint'
+const LOCAL_CHAT_ENDPOINT = 'http://127.0.0.1:8001/chat/local/endpoint'
 const SIGNIN_QUERY_VALUE = 'signin'
 const router = useRouter()
 const route = useRoute()
@@ -81,6 +82,13 @@ const isAgentPickerExpanded = ref(true)
 const isAiResponding = ref(false)
 const useThinking = ref(true)
 const streamHint = ref('')
+const localMessages = ref<ChatMessage[]>([])
+const localInput = ref('')
+const localModelStatus = ref<'checking' | 'ready' | 'loading' | 'unavailable'>('checking')
+const localModelError = ref('')
+const localModelStatusText = computed(() => ({
+  checking: '检查本地模型', ready: '本机模型就绪', loading: '本机推理中', unavailable: '模型未就绪',
+})[localModelStatus.value])
 const shouldStickToLatestMessage = ref(true)
 
 let activeAiAbortController: AbortController | null = null
@@ -98,16 +106,19 @@ const syncChatsInFlight = ref(false)
 const isAccountRoute = computed(() => route.name === 'account')
 const isAuthCallbackRoute = computed(() => route.name === 'auth-callback')
 const isStrategyRoute = computed(() => route.name === 'strategy-workbench')
+const isLocalAiRoute = computed(() => route.name === 'local-ai' && isDesktopClient)
 const isDashboardRoute = computed(() => route.name === 'dashboard')
 const desktopView = ref<'market' | 'ai' | null>(isDesktopClient ? 'market' : null)
 const desktopWorkspaces = [
   { id: 'market', title: '市场总览' },
   { id: 'ai', title: 'AI 投顾' },
+  { id: 'local-ai', title: '本地智投' },
   { id: 'strategy', title: '策略工作台' },
   { id: 'account', title: '账号中心' },
 ] as const
 const activeDesktopWorkspace = computed(() => {
   if (isAccountRoute.value) return 'account'
+  if (isLocalAiRoute.value) return 'local-ai'
   if (isStrategyRoute.value) return 'strategy'
   return desktopView.value || 'market'
 })
@@ -115,6 +126,8 @@ function navigateDesktop(view: typeof desktopWorkspaces[number]['id']): void {
   if (view === 'market' || view === 'ai') {
     desktopView.value = view
     void router.push('/')
+  } else if (view === 'local-ai' && isDesktopClient) {
+    void router.push('/local-ai')
   } else if (authStore.isAuthenticated) {
     void router.push(`/${view}`)
   } else {
@@ -129,6 +142,7 @@ const hasVisitedStrategy = ref(isStrategyRoute.value)
 const pageTitle = computed(() => {
   if (isAuthCallbackRoute.value) return '正在完成账号登录'
   if (isAccountRoute.value) return '账号中心'
+  if (isLocalAiRoute.value) return '本地智投'
   if (isDesktopClient && !isStrategyRoute.value && desktopView.value === 'ai') return 'AI 投顾'
   return isStrategyRoute.value ? '策略工作台' : '市场总览'
 })
@@ -137,6 +151,8 @@ const pageDescription = computed(() =>
     ? '正在校验授权结果、换取 Access Token 并同步用户资料，请稍候片刻。'
     : isAccountRoute.value
       ? '查看当前 Ksuser 登录会话、授权范围和设备状态。'
+        : isLocalAiRoute.value
+          ? '仅在本机运行 DeepSeek-R1-Distill-Qwen-1.5B，投资数据通过同一 MCP 数据源获取。'
       : isStrategyRoute.value
         ? '集中处理策略分析、组合体检、模拟交易和异常解释。'
         : authStore.isAuthenticated
@@ -147,6 +163,7 @@ const activeStageKey = computed(() => {
   if (isAuthCallbackRoute.value) return 'auth-callback'
   if (isAccountRoute.value) return 'account'
   if (isStrategyRoute.value) return 'strategy'
+  if (isLocalAiRoute.value) return 'local-ai'
   return 'dashboard'
 })
 const currentUserName = computed(() => authStore.userLabel)
@@ -1031,6 +1048,79 @@ async function sendMessage(): Promise<void> {
   }
 }
 
+async function checkLocalModel(): Promise<void> {
+  if (!isDesktopClient) return
+  try {
+    const response = await fetch('http://127.0.0.1:8001/health', { signal: AbortSignal.timeout(2500) })
+    const data = await response.json() as { modelReady?: boolean; message?: string }
+    localModelStatus.value = data.modelReady ? 'ready' : 'unavailable'
+    localModelError.value = data.modelReady ? '' : data.message || '本地模型运行时或权重尚未安装。'
+  } catch {
+    localModelStatus.value = 'unavailable'
+    localModelError.value = '本地模型服务未启动。请确认桌面客户端的本地模型运行时已安装。'
+  }
+}
+
+function onLocalInputKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    void sendLocalMessage()
+  }
+}
+
+async function sendLocalMessage(): Promise<void> {
+  const prompt = localInput.value.trim()
+  if (!prompt || localModelStatus.value === 'loading') return
+  localMessages.value.push({ role: 'user', content: prompt }, { role: 'ai', content: '' })
+  const answer = localMessages.value[localMessages.value.length - 1]
+  if (!answer) return
+  localInput.value = ''
+  localModelStatus.value = 'loading'
+  localModelError.value = ''
+  try {
+    const mcpResponse = await apiFetch('/chat/local-context', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    })
+    if (!mcpResponse.ok) throw new Error('同步投资 MCP 数据失败。')
+    const mcpData = await mcpResponse.json() as { records?: unknown[] }
+    const response = await fetch(LOCAL_CHAT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      body: JSON.stringify({
+        agentId: PRIMARY_AGENT_ID,
+        systemPrompt: DEFAULT_AGENT.systemPrompt,
+        originalPrompt: prompt,
+        messages: localMessages.value.slice(0, -2).map((message) => ({ role: message.role === 'ai' ? 'assistant' : 'user', content: message.content })),
+        mcpContext: mcpData.records || [],
+      }),
+    })
+    if (!response.ok || !response.body) throw new Error((await response.text()) || '本地模型请求失败。')
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const parsed = consumeSseFrames(buffer)
+      buffer = parsed.rest
+      for (const frame of parsed.frames) {
+        const payload = parseSseData(frame.data)
+        if (frame.event === 'message' && typeof payload?.content === 'string') answer.content += payload.content
+        if (frame.event === 'error') throw new Error(typeof payload?.message === 'string' ? payload.message : '本地模型处理失败。')
+      }
+    }
+    if (!answer.content) answer.content = '模型未返回文本内容。'
+    localModelStatus.value = 'ready'
+  } catch (error) {
+    localMessages.value.pop()
+    localModelStatus.value = 'unavailable'
+    localModelError.value = error instanceof Error ? error.message : '本地模型请求失败。'
+  }
+}
+
 function onChatInputKeydown(event: KeyboardEvent): void {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
@@ -1216,7 +1306,10 @@ watch(
   { immediate: true },
 )
 
-onMounted(() => window.addEventListener('desktop-view-change', onDesktopViewChange))
+onMounted(() => {
+  window.addEventListener('desktop-view-change', onDesktopViewChange)
+  if (isDesktopClient) void checkLocalModel()
+})
 
 onBeforeUnmount(() => {
   window.removeEventListener('desktop-view-change', onDesktopViewChange)
@@ -1354,6 +1447,30 @@ onBeforeUnmount(() => {
             @revoke-others="revokeOtherSessions"
             @refresh-sessions="refreshAccountSessions"
           />
+
+          <section v-else-if="isLocalAiRoute" class="local-ai-workspace">
+            <section class="panel local-ai-chat-panel">
+              <div class="panel-header">
+                <div>
+                  <div class="panel-title">本地智投问答</div>
+                  <div class="panel-subtitle">DeepSeek-R1-Distill-Qwen-1.5B · 本机推理</div>
+                </div>
+                <span class="local-model-status" :class="localModelStatus">{{ localModelStatusText }}</span>
+              </div>
+              <div class="local-ai-messages" aria-live="polite">
+                <div v-for="(message, index) in localMessages" :key="index" class="local-ai-message" :class="message.role">
+                  <div v-if="message.role === 'ai'" v-html="renderAiMessage(message.content)"></div>
+                  <div v-else>{{ message.content }}</div>
+                </div>
+                <div v-if="!localMessages.length" class="local-ai-empty">你好，我是本地智投问答。提出问题后，我会在本机运行模型，并按需查询投资 MCP 数据。</div>
+              </div>
+              <form class="local-ai-composer" @submit.prevent="sendLocalMessage">
+                <textarea v-model="localInput" :disabled="localModelStatus === 'loading'" placeholder="输入投资相关问题" @keydown="onLocalInputKeydown"></textarea>
+                <button class="btn primary" type="submit" :disabled="!localInput.trim() || localModelStatus === 'loading'">{{ localModelStatus === 'loading' ? '生成中...' : '发送' }}</button>
+              </form>
+              <div v-if="localModelError" class="local-ai-error">{{ localModelError }}</div>
+            </section>
+          </section>
 
           <template v-else>
             <Transition
