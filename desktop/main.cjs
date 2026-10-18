@@ -114,12 +114,6 @@ async function applyDesktopShell(contents) {
           })
           const injectedLocalButton = sidebar.querySelector('[data-route="local-ai"]')
           if (injectedLocalButton) injectedLocalButton.dataset.localAiHandler = 'installed'
-          injectedLocalButton?.addEventListener('click', () => {
-            const nativeButton = Array.from(sidebar.querySelectorAll('button')).find((item) => item.textContent?.trim() === '本地智投' && item !== injectedLocalButton)
-            if (nativeButton) nativeButton.click()
-            else history.pushState({}, '', '/local-ai')
-            window.dispatchEvent(new PopStateEvent('popstate'))
-          })
           sidebar.querySelector('[data-route="strategy"]')?.addEventListener('click', () => {
             document.getElementById('pageNavStrategy')?.click()
             document.getElementById('pageNavStrategyLocked')?.click()
@@ -149,12 +143,26 @@ async function applyDesktopShell(contents) {
         }
         if (!localItem.dataset.localAiHandler) {
           localItem.dataset.localAiHandler = 'installed'
-          localItem.addEventListener('click', () => {
-            const nativeButton = Array.from(sidebar.querySelectorAll('button')).find((item) => item.textContent?.trim() === '本地智投' && item !== localItem)
-            if (nativeButton) nativeButton.click()
-            else history.pushState({}, '', '/local-ai')
+        }
+
+        // Use one delegated handler for both the injected and Vue-rendered
+        // entry. This avoids stale listeners after Vue reorders/re-renders the
+        // sidebar, which previously made the entry work only from one side.
+        if (!sidebar.dataset.localAiClickHandler) {
+          sidebar.dataset.localAiClickHandler = 'installed'
+          sidebar.addEventListener('click', (event) => {
+            const target = event.target instanceof Element
+              ? event.target.closest('[data-route="local-ai"]')
+              : null
+            if (!target || !sidebar.contains(target)) return
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            if (location.pathname !== '/local-ai') {
+              history.pushState({}, '', '/local-ai')
+            }
             window.dispatchEvent(new PopStateEvent('popstate'))
-          })
+            scheduleNavigationSync()
+          }, true)
         }
 
         if (!window.__desktopNavigationInstalled) {

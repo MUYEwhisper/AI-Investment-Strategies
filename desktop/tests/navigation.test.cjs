@@ -40,6 +40,8 @@ test('untrusted origins and privileged URL schemes cannot enter the app', () => 
 test('the local assistant uses the Vue desktop route', () => {
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.cjs'), 'utf8')
   assert.match(main, /history\.pushState\(\{\}, '', '\/local-ai'\)/)
+  assert.match(main, /data-route="local-ai"/)
+  assert.match(main, /localAiClickHandler/)
   assert.doesNotMatch(main, /loadFile\(localAiFile\)/)
 })
 

@@ -16,6 +16,7 @@ async function main() {
     const page = await application.firstWindow()
     const localButton = page.locator('.desktop-sidebar-item').filter({ hasText: '本地智投' })
     await expect(localButton).toBeVisible({ timeout: 60000 })
+    await expect(localButton).toHaveCount(1)
     await localButton.click()
     await expect.poll(() => page.url()).toContain('/local-ai')
     await expect(page.locator('.chat-panel')).toBeVisible()
@@ -34,6 +35,8 @@ async function main() {
     }
     await page.locator('.desktop-sidebar-item').filter({ hasText: '市场总览' }).click()
     await expect.poll(() => page.url(), { timeout: 60000 }).toBe('https://www.muyewhisper.cn/')
+    await localButton.click()
+    await expect.poll(() => page.url(), { timeout: 60000 }).toContain('/local-ai')
     console.log(JSON.stringify({ localAssistant: 'vue-route', navigation: 'passed', history: 'visible' }))
   } finally {
     await application.close()
