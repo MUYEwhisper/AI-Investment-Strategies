@@ -21,45 +21,65 @@
     body.leaving .shell { animation: workspace-out .2s ease-in forwards; pointer-events: none; }
     @keyframes workspace-in { to { opacity: 1; transform: translateY(0) scale(1); } }
     @keyframes workspace-out { to { opacity: 0; transform: translateY(-8px) scale(.995); } }
-    .topbar { display: flex; flex: 0 0 66px; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 16px; border: 1px solid #d5dee8; border-radius: 8px; background: #fff; box-shadow: 0 4px 14px rgba(26,48,73,.08); }
+    .topbar { display: flex; flex: 0 0 66px; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 16px; border: 1px solid #d5dee8; border-radius: 8px; background: #fff; }
     .brand { min-width: 0; }
     .brand strong { display: block; color: #1e3852; font-size: 17px; }
     .brand span { display: block; margin-top: 3px; color: #6b7b8f; font-size: 11px; }
     .topbar-actions { display: flex; align-items: center; gap: 10px; }
-    .model-status { padding: 5px 9px; border: 1px solid #c9d7e5; border-radius: 999px; color: #536b83; font-size: 11px; white-space: nowrap; }
+    .model-status { padding: 5px 9px; border: 1px solid #c9d7e5; border-radius: 7px; color: #536b83; font-size: 11px; white-space: nowrap; }
     .model-status.ready { border-color: #9bd5b6; color: #27754d; background: #f2fbf5; }
     .model-status.busy { border-color: #9bc8e7; color: #17649c; background: #eef7ff; }
     .model-status.error { border-color: #e2b4b4; color: #a33e3e; background: #fff7f7; }
     .workspace { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); gap: 12px; }
-    .sidebar, .chat { min-width: 0; min-height: 0; border: 1px solid #d5dee8; border-radius: 8px; background: #fff; box-shadow: 0 4px 14px rgba(26,48,73,.07); }
+    .sidebar, .chat { min-width: 0; min-height: 0; border: 1px solid #d5dee8; border-radius: 8px; background: #fff; }
     .sidebar { display: flex; flex-direction: column; overflow: hidden; }
-    .agent-card { margin: 12px; padding: 12px; border: 1px solid #8bb7d6; border-radius: 7px; background: #eef5fa; }
-    .agent-card strong { display: block; color: #1e3852; font-size: 14px; }
-    .agent-card span { display: block; margin-top: 5px; color: #6b7b8f; font-size: 11px; line-height: 1.5; }
-    .history-head { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; border-top: 1px solid #e5ebf1; border-bottom: 1px solid #e5ebf1; background: #f7f9fb; }
-    .history-head strong { color: #334b63; font-size: 12px; }
+    .sidebar { border-color: #263d56; background: #17283e; color: #eef5fb; }
+    .agent-card { margin: 0; padding: 16px 16px 14px; border: 0; border-radius: 0; background: transparent; }
+    .agent-card strong { display: block; color: #f2f7fb; font-size: 14px; }
+    .agent-card span { display: block; margin-top: 5px; color: #9db1c6; font-size: 11px; line-height: 1.5; }
+    .history-head { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; border-top: 1px solid rgba(228,239,248,.15); border-bottom: 1px solid rgba(228,239,248,.15); background: transparent; }
+    .history-head strong { color: #c5d3e1; font-size: 12px; }
     .history-head button { min-height: 29px; padding: 0 9px; font-size: 11px; }
     .history-list { min-height: 0; flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: #b8c9da transparent; }
-    .history-item { display: flex; min-width: 0; align-items: center; gap: 5px; margin-bottom: 5px; padding: 8px; border: 1px solid transparent; border-radius: 6px; cursor: pointer; animation: history-in .2s ease both; }
+    .history-item { display: flex; min-width: 0; align-items: center; gap: 5px; margin-bottom: 5px; padding: 8px; border: 1px solid transparent; border-radius: 6px; color: #c5d3e1; cursor: pointer; animation: history-in .2s ease both; }
     @keyframes history-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-    .history-item:hover { background: #f1f6fa; }
-    .history-item.active { border-color: #a9c8df; background: #eef5fa; }
+    .history-item:hover { background: #203952; }
+    .history-item.active { border-color: #3e86bf; background: #2a5e8e; color: #fff; }
     .history-meta { min-width: 0; flex: 1; }
-    .history-title { overflow: hidden; color: #304861; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-    .history-time { overflow: hidden; margin-top: 4px; color: #8a99a9; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-    .history-delete { min-height: 26px; flex: 0 0 auto; padding: 0 6px; color: #7a8794; font-size: 10px; }
-    .history-empty { padding: 12px 8px; color: #8492a0; font-size: 11px; line-height: 1.5; }
+    .history-title { overflow: hidden; color: inherit; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .history-time { overflow: hidden; margin-top: 4px; color: #9db1c6; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .history-delete { min-height: 26px; flex: 0 0 auto; padding: 0 6px; border-color: rgba(228,239,248,.18); color: #c5d3e1; background: transparent; font-size: 10px; }
+    .history-delete:hover:not(:disabled) { color: #fff; background: #203952; }
+    .history-empty { padding: 12px 8px; color: #9db1c6; font-size: 11px; line-height: 1.5; }
     .chat { display: flex; flex-direction: column; overflow: hidden; }
-    .chat-toolbar { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid #d5dee8; background: #f7f9fb; }
+    .chat-toolbar { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid #d5dee8; background: #fff; }
     .chat-toolbar .caption { overflow: hidden; color: #536b83; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
     .gpu-control { display: flex; flex: 0 0 auto; align-items: center; gap: 7px; color: #48627a; font-size: 11px; white-space: nowrap; }
     .gpu-control input { accent-color: #2f76b5; }
-    .messages { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 14px; overflow-y: auto; overscroll-behavior: contain; padding: 20px clamp(14px, 3vw, 34px); scrollbar-width: thin; scrollbar-color: #b8c9da transparent; }
-    .message { width: fit-content; max-width: min(94%, 1000px); padding: 11px 14px; border: 1px solid #d5dee8; border-radius: 8px; color: #253d54; background: #fff; font-size: 13px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; animation: message-in .2s ease both; }
+    .messages { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 12px; overflow-y: auto; overscroll-behavior: contain; padding: 20px clamp(14px, 3vw, 34px); background: #f8fafc; scrollbar-width: thin; scrollbar-color: #b8c9da transparent; }
+    .message { width: fit-content; max-width: min(94%, 1000px); padding: 11px 14px; border: 1px solid #d5dee8; border-radius: 8px; color: #253d54; background: #fff; font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; word-break: break-word; animation: message-in .2s ease both; }
     .message.user { align-self: flex-end; border-color: #bfd4e6; background: #edf4f9; }
     .message.ai { align-self: flex-start; }
-    .message.ai h { color: #1e3852; }
     .message.pending { color: #8492a0; }
+    .message.ai p, .message.ai ul, .message.ai ol, .message.ai pre, .message.ai blockquote, .message.ai hr, .message.ai h1, .message.ai h2, .message.ai h3, .message.ai h4, .message.ai h5, .message.ai h6 { margin: 0 0 .72em; }
+    .message.ai > :first-child { margin-top: 0; }
+    .message.ai > :last-child { margin-bottom: 0; }
+    .message.ai h1, .message.ai h2, .message.ai h3, .message.ai h4, .message.ai h5, .message.ai h6 { color: #173354; line-height: 1.35; }
+    .message.ai h1 { font-size: 1.28em; }
+    .message.ai h2 { font-size: 1.18em; }
+    .message.ai h3 { font-size: 1.08em; }
+    .message.ai ul, .message.ai ol { padding-left: 1.4em; }
+    .message.ai li + li { margin-top: .28em; }
+    .message.ai code { padding: .1em .35em; border-radius: 5px; background: #eef4fa; font-family: Consolas, monospace; font-size: .94em; }
+    .message.ai pre { overflow-x: auto; padding: .75em .9em; border: 1px solid #d7e5fa; border-radius: 7px; background: #f4f8ff; }
+    .message.ai pre code { padding: 0; background: transparent; }
+    .message.ai blockquote { padding-left: .9em; border-left: 3px solid #9fc0ef; color: #4b6485; }
+    .message.ai a { color: #1363df; text-decoration: none; }
+    .message.ai a:hover { text-decoration: underline; }
+    .message.ai .md-table-wrap { max-width: 100%; overflow-x: auto; margin: 0 0 .72em; }
+    .message.ai table { min-width: 380px; border-collapse: collapse; border: 1px solid #d7e5fa; background: #fff; }
+    .message.ai th, .message.ai td { padding: .45em .6em; border: 1px solid #d7e5fa; text-align: left; vertical-align: top; }
+    .message.ai th { color: #173354; background: #edf4ff; }
     @keyframes message-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
     .setup { display: flex; align-items: center; gap: 14px; padding: 11px 14px; border-bottom: 1px solid #e5ebf1; background: #f7fafc; }
     .setup[hidden] { display: none; }
@@ -188,13 +208,65 @@
       }
     }
     function scrollBottom(force = false) { requestAnimationFrame(() => { const panel = $('messages'); if (force || state.stickToBottom) panel.scrollTop = panel.scrollHeight }) }
+    function escapeHtml(value) {
+      return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    }
+    function safeUrl(value) {
+      const normalized = String(value).trim()
+      return /^(https?:|mailto:)/i.test(normalized) ? escapeHtml(normalized) : null
+    }
+    function renderInlineMarkdown(value) {
+      const code = []
+      let html = escapeHtml(value).replace(/`([^`\n]+)`/g, (_, text) => {
+        const token = `@@CODE_${code.length}@@`; code.push(`<code>${text}</code>`); return token
+      })
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+        const safeHref = safeUrl(href); return safeHref ? `<a href="${safeHref}" target="_blank" rel="noreferrer">${label}</a>` : label
+      })
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+      return html.replace(/@@CODE_(\d+)@@/g, (_, index) => code[Number(index)] || '')
+    }
+    function renderMarkdownToHtml(source) {
+      const lines = String(source || '').replace(/\r\n?/g, '\n').split('\n')
+      const blocks = []; let paragraph = []; let listType = ''; let listItems = []; let quote = []; let fence = false; let fenceLines = []
+      const flushParagraph = () => { if (paragraph.length) { blocks.push(`<p>${renderInlineMarkdown(paragraph.join('\n')).replace(/\n/g, '<br />')}</p>`); paragraph = [] } }
+      const flushList = () => { if (listType && listItems.length) blocks.push(`<${listType}>${listItems.map((item) => `<li>${renderInlineMarkdown(item)}</li>`).join('')}</${listType}>`); listType = ''; listItems = [] }
+      const flushQuote = () => { if (quote.length) { blocks.push(`<blockquote>${renderMarkdownToHtml(quote.join('\n'))}</blockquote>`); quote = [] } }
+      const flushFence = () => { blocks.push(`<pre><code>${escapeHtml(fenceLines.join('\n'))}</code></pre>`); fence = false; fenceLines = [] }
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index] || ''
+        if (/^```/.test(line)) { flushParagraph(); flushList(); flushQuote(); if (fence) flushFence(); else { fence = true; fenceLines = [] }; continue }
+        if (fence) { fenceLines.push(line); continue }
+        if (!line.trim()) { flushParagraph(); flushList(); flushQuote(); continue }
+        const quoteMatch = line.match(/^>\s?(.*)$/)
+        if (quoteMatch) { flushParagraph(); flushList(); quote.push(quoteMatch[1]); continue }
+        flushQuote()
+        const heading = line.match(/^(#{1,6})\s+(.*)$/)
+        if (heading) { flushParagraph(); flushList(); const level = heading[1].length; blocks.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`); continue }
+        if (/^([-*_])(?:\s*\1){2,}\s*$/.test(line)) { flushParagraph(); flushList(); blocks.push('<hr />'); continue }
+        const ordered = line.match(/^\d+\.\s+(.*)$/); const unordered = line.match(/^[-*+]\s+(.*)$/)
+        if (ordered || unordered) { flushParagraph(); const nextType = ordered ? 'ol' : 'ul'; if (listType && listType !== nextType) flushList(); listType = nextType; listItems.push((ordered || unordered)[1]); continue }
+        if (listType && /^\s+/.test(line) && listItems.length) { listItems[listItems.length - 1] += ` ${line.trim()}`; continue }
+        flushList(); paragraph.push(line)
+      }
+      if (fence) flushFence(); flushParagraph(); flushList(); flushQuote(); return blocks.join('')
+    }
+    function updateMessageNode(node, message, renderMarkdown = false) {
+      if (!node) return
+      node.className = `message ${message.role === 'user' ? 'user' : 'ai'}${message.pending ? ' pending' : ''}`
+      if (renderMarkdown && message.role !== 'user') node.innerHTML = renderMarkdownToHtml(message.content)
+      else node.textContent = message.content
+    }
     function renderMessages(force = false) {
       const panel = $('messages'); panel.replaceChildren()
       const chat = activeChat()
+      let pendingNode = null
       for (const message of chat?.messages || []) {
-        const node = document.createElement('div'); node.className = `message ${message.role === 'user' ? 'user' : 'ai'}${message.pending ? ' pending' : ''}`; node.textContent = message.content; panel.append(node)
+        const node = document.createElement('div'); updateMessageNode(node, message, !message.pending && message.role !== 'user'); panel.append(node)
+        if (message.pending) pendingNode = node
       }
       scrollBottom(force)
+      return pendingNode
     }
     function renderModel(next) {
       state.model = { ...state.model, ...next }
@@ -257,7 +329,7 @@
       event.preventDefault(); const prompt = $('input').value.trim(); if (!prompt || state.busy || !state.model.running) return
       let chat = activeChat(); if (!chat) { createChat(); chat = activeChat() }
       const userMessage = { role: 'user', content: prompt }; const answer = { role: 'assistant', content: '正在生成回复…', pending: true }
-      chat.messages.push(userMessage, answer); if (chat.title === '新对话') chat.title = prompt.slice(0, 30); $('input').value = ''; state.busy = true; setError(''); renderHistory(); renderMessages(true); renderModel({})
+      chat.messages.push(userMessage, answer); if (chat.title === '新对话') chat.title = prompt.slice(0, 30); $('input').value = ''; state.busy = true; setError(''); renderHistory(); const answerNode = renderMessages(true); renderModel({})
       try {
         let mcpContext = []
         try { const context = await fetch(SITE + '/chat/local-context', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) }); if (context.ok) mcpContext = (await context.json()).records || [] } catch { /* MCP is optional for general questions. */ }
@@ -273,10 +345,10 @@
             const line = frame.split('\n').find((item) => item.startsWith('data: ')); if (!line || line === 'data: [DONE]') continue
             const data = JSON.parse(line.slice(6)); if (data.error?.message) throw new Error(data.error.message)
             const delta = data.choices?.[0]?.delta || {}; output += delta.content || ''
-            answer.content = output || '正在生成回复…'; renderMessages(false)
+            answer.content = output || '正在生成回复…'; updateMessageNode(answerNode, answer); scrollBottom(false)
           }
         }
-        answer.content = normalizeAnswer(output); delete answer.pending; renderModel({ running: true }); persist()
+        answer.content = normalizeAnswer(output); delete answer.pending; updateMessageNode(answerNode, answer, true); renderModel({ running: true }); persist()
       } catch (error) {
         chat.messages = chat.messages.filter((message) => message !== answer)
         setError(error instanceof Error ? error.message : '本地模型请求失败。'); renderModel({ running: false })

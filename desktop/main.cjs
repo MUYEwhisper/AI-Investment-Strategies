@@ -33,7 +33,10 @@ try {
 async function applyDesktopShell(contents) {
   if (!desktopShellCss || !isWebsiteNavigation(contents.getURL())) return
   try {
-    await contents.insertCSS(desktopShellCss)
+    const alreadyApplied = await contents.executeJavaScript(
+      'document.documentElement.classList.contains("desktop-shell")', true,
+    ).catch(() => false)
+    if (!alreadyApplied) await contents.insertCSS(desktopShellCss)
     await contents.executeJavaScript(`
       (() => {
         const root = document.documentElement
@@ -139,6 +142,7 @@ async function applyDesktopShell(contents) {
           localItem.className = 'desktop-sidebar-item'
           localItem.type = 'button'
           localItem.dataset.route = 'local-ai'
+          localItem.dataset.localAiRoute = 'electron'
           localItem.textContent = '本地智投'
           nav.appendChild(localItem)
         }
@@ -465,8 +469,18 @@ async function goHome() {
   if (!mainWindow || mainWindow.isDestroyed()) return
   try {
     await mainWindow.loadURL(SITE_URL)
+    await applyDesktopShell(mainWindow.webContents)
   } catch {
     // did-fail-load displays the reconnect screen for main-frame network failures.
+  }
+}
+
+async function goLocalAi() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  try {
+    await mainWindow.loadFile(localAiFile)
+  } catch {
+    // The app shell's offline page handles main-frame navigation failures.
   }
 }
 
@@ -532,7 +546,7 @@ function createWindow() {
   const contents = mainWindow.webContents
   contents.on('ipc-message', (_event, channel) => {
     if (channel === 'open-local-ai') {
-      void contents.loadFile(localAiFile).catch(() => {})
+      void goLocalAi()
     }
     if (channel === 'open-website') void goHome()
   })

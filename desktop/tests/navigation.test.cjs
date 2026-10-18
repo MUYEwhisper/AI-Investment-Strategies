@@ -37,9 +37,10 @@ test('untrusted origins and privileged URL schemes cannot enter the app', () => 
   assert.equal(isExternalLink('javascript:alert(1)'), false)
 })
 
-test('the local assistant opens its bundled desktop page', () => {
+test('the local assistant opens its bundled desktop page and the home restores desktop chrome', () => {
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.cjs'), 'utf8')
   assert.match(main, /loadFile\(localAiFile\)/)
+  assert.match(main, /await applyDesktopShell\(mainWindow\.webContents\)/)
   assert.equal(fs.existsSync(path.join(__dirname, '..', 'local-ai.html')), true)
 })
 
