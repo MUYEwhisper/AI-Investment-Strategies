@@ -207,6 +207,7 @@
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 122px);
+  height: calc(100vh - 122px);
 }
 
 .desktop-shell .local-ai-chat-panel .panel-header {
@@ -282,6 +283,31 @@
   color: #a33e3e;
   font-size: 12px;
   background: #fff;
+}
+
+.desktop-shell .local-gpu-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #48627a;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.desktop-shell .local-gpu-status {
+  color: #6b7b8f;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.desktop-shell .local-ai-chat-panel .chat-main {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-shell .local-ai-chat-panel .chat-body,
+.desktop-shell .local-ai-chat-panel .messages {
+  min-height: 0;
 }
 
 .desktop-shell .guest-chip,
@@ -630,6 +656,11 @@
 
   .desktop-shell .top-grid {
     height: auto;
+  }
+
+  .desktop-shell .local-ai-chat-panel {
+    height: auto;
+    min-height: calc(100vh - 122px);
   }
 
   .desktop-shell.desktop-legacy-layout .app-page.desktop-view-ai .chat-panel {

@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu, dialog, shell, screen, session, ipcMain } = re
 const path = require('node:path')
 const fs = require('node:fs')
 const crypto = require('node:crypto')
-const { spawn } = require('node:child_process')
+const { spawn, spawnSync } = require('node:child_process')
 const https = require('node:https')
 const { SITE_URL, REPOSITORY_URL, RELEASES_URL, isAppNavigation, isWebsiteNavigation, isExternalLink } = require('./navigation.cjs')
 const { readWindowState, saveWindowState } = require('./window-state.cjs')
@@ -18,8 +18,8 @@ let mainWindow
 let localModelProcess
 let localModelServerReady = false
 let localModelInstall = null
+let localModelGpuActive = false
 const offlineFile = path.join(__dirname, 'offline.html')
-const localAiFile = path.join(__dirname, 'local-ai.html')
 const desktopShellCssFile = path.join(__dirname, '..', 'frontend', 'src', 'assets', 'desktop-shell.css')
 
 let desktopShellCss
@@ -112,8 +112,13 @@ async function applyDesktopShell(contents) {
             setView('ai')
             scheduleNavigationSync()
           })
-          sidebar.querySelector('[data-route="local-ai"]')?.addEventListener('click', () => {
-            window.aiInvestmentDesktop?.openLocalAi?.()
+          const injectedLocalButton = sidebar.querySelector('[data-route="local-ai"]')
+          if (injectedLocalButton) injectedLocalButton.dataset.localAiHandler = 'installed'
+          injectedLocalButton?.addEventListener('click', () => {
+            const nativeButton = Array.from(sidebar.querySelectorAll('button')).find((item) => item.textContent?.trim() === '本地智投' && item !== injectedLocalButton)
+            if (nativeButton) nativeButton.click()
+            else history.pushState({}, '', '/local-ai')
+            window.dispatchEvent(new PopStateEvent('popstate'))
           })
           sidebar.querySelector('[data-route="strategy"]')?.addEventListener('click', () => {
             document.getElementById('pageNavStrategy')?.click()
@@ -130,6 +135,10 @@ async function applyDesktopShell(contents) {
 
         let localItem = sidebar.querySelector('[data-route="local-ai"]')
         if (!localItem) {
+          localItem = Array.from(sidebar.querySelectorAll('button')).find((item) => item.textContent?.trim() === '本地智投')
+          if (localItem) localItem.dataset.route = 'local-ai'
+        }
+        if (!localItem) {
           const nav = sidebar.querySelector('.desktop-sidebar-nav') || sidebar
           localItem = document.createElement('button')
           localItem.className = 'desktop-sidebar-item'
@@ -140,7 +149,12 @@ async function applyDesktopShell(contents) {
         }
         if (!localItem.dataset.localAiHandler) {
           localItem.dataset.localAiHandler = 'installed'
-          localItem.addEventListener('click', () => window.aiInvestmentDesktop?.openLocalAi?.())
+          localItem.addEventListener('click', () => {
+            const nativeButton = Array.from(sidebar.querySelectorAll('button')).find((item) => item.textContent?.trim() === '本地智投' && item !== localItem)
+            if (nativeButton) nativeButton.click()
+            else history.pushState({}, '', '/local-ai')
+            window.dispatchEvent(new PopStateEvent('popstate'))
+          })
         }
 
         if (!window.__desktopNavigationInstalled) {
@@ -194,6 +208,40 @@ function modelPath() {
   return path.join(modelDirectory(), MODEL_FILE)
 }
 
+function modelSettingsPath() {
+  return path.join(app.getPath('userData'), 'local-model-settings.json')
+}
+
+function readLocalModelSettings() {
+  try {
+    const settings = JSON.parse(fs.readFileSync(modelSettingsPath(), 'utf8'))
+    return { gpuEnabled: Boolean(settings?.gpuEnabled) }
+  } catch {
+    return { gpuEnabled: false }
+  }
+}
+
+function writeLocalModelSettings(settings) {
+  fs.mkdirSync(path.dirname(modelSettingsPath()), { recursive: true })
+  fs.writeFileSync(modelSettingsPath(), JSON.stringify({ gpuEnabled: Boolean(settings.gpuEnabled) }, null, 2))
+}
+
+function detectGpu() {
+  const resourcesDir = process.resourcesPath || path.join(__dirname, '..')
+  const runtimeDir = app.isPackaged
+    ? path.join(resourcesDir, 'local-runtime')
+    : path.join(__dirname, 'llama-runtime')
+  // NVIDIA detection alone is insufficient: the bundled llama runtime must
+  // also contain a CUDA backend before we advertise or pass GPU flags.
+  if (!fs.existsSync(path.join(runtimeDir, 'ggml-cuda.dll'))) return false
+  try {
+    const result = spawnSync('nvidia-smi', ['--query-gpu=name', '--format=csv,noheader'], { windowsHide: true, encoding: 'utf8', timeout: 2500 })
+    return result.status === 0 && Boolean(result.stdout?.trim())
+  } catch {
+    return false
+  }
+}
+
 function localModelStatus() {
   const installed = fs.existsSync(modelPath()) && fs.statSync(modelPath()).size > 1_000_000_000
   return {
@@ -202,6 +250,9 @@ function localModelStatus() {
     running: localModelServerReady,
     downloading: Boolean(localModelInstall),
     progress: localModelInstall?.progress || 0,
+    gpuEnabled: readLocalModelSettings().gpuEnabled,
+    gpuAvailable: detectGpu(),
+    gpuActive: localModelGpuActive,
     message: localModelInstall?.message || (installed ? '本地模型已安装' : '本地模型尚未安装'),
   }
 }
@@ -220,10 +271,17 @@ function startLocalModelServer() {
   const llamaServer = path.join(llamaDir, process.platform === 'win32' ? 'llama-server.exe' : 'llama-server')
   if (!fs.existsSync(llamaServer) || !fs.existsSync(bundledModel)) return
   if (localModelProcess && !localModelProcess.killed) return
-  localModelProcess = spawn(llamaServer, [
+  const settings = readLocalModelSettings()
+  const gpuRequested = settings.gpuEnabled && detectGpu()
+  localModelGpuActive = gpuRequested
+  const serverArgs = [
     '--model', bundledModel, '--host', '127.0.0.1', '--port', '8001',
     '--ctx-size', '4096', '--threads', String(Math.max(2, Math.min(8, Number.parseInt(process.env.LOCAL_MODEL_THREADS || '4', 10)))),
     '--reasoning', 'off',
+  ]
+  if (gpuRequested) serverArgs.push('--n-gpu-layers', '999')
+  localModelProcess = spawn(llamaServer, [
+    ...serverArgs,
   ], {
     cwd: llamaDir,
     env: {
@@ -234,10 +292,12 @@ function startLocalModelServer() {
   })
   localModelProcess.on('error', (error) => {
     localModelServerReady = false
+    localModelGpuActive = false
     if (!app.isPackaged) console.error('Local model server failed to start:', error)
   })
-  localModelProcess.on('exit', () => { localModelProcess = undefined; localModelServerReady = false; broadcastModelStatus() })
+  localModelProcess.on('exit', () => { localModelProcess = undefined; localModelServerReady = false; localModelGpuActive = false; broadcastModelStatus() })
   broadcastModelStatus()
+  void waitForLocalModelServer().catch(() => {})
 }
 
 function waitForLocalModelServer(timeoutMs = 180000) {
@@ -330,6 +390,9 @@ function stopLocalModelServer() {
   if (!localModelProcess || localModelProcess.killed) return
   localModelProcess.kill()
   localModelProcess = undefined
+  localModelServerReady = false
+  localModelGpuActive = false
+  broadcastModelStatus()
 }
 
 ipcMain.handle('install-local-model', async () => {
@@ -350,6 +413,18 @@ ipcMain.handle('install-local-model', async () => {
   } catch (error) {
     return { ...localModelStatus(), error: error instanceof Error ? error.message : '本地模型安装失败' }
   }
+})
+
+ipcMain.handle('local-model-settings', () => ({ ...readLocalModelSettings(), gpuAvailable: detectGpu(), gpuActive: localModelGpuActive }))
+ipcMain.handle('set-local-model-settings', async (_event, patch = {}) => {
+  const settings = { ...readLocalModelSettings(), gpuEnabled: Boolean(patch.gpuEnabled) }
+  writeLocalModelSettings(settings)
+  if (localModelProcess && !localModelProcess.killed) {
+    stopLocalModelServer()
+    startLocalModelServer()
+    try { await waitForLocalModelServer() } catch { /* the UI can retry after a failed restart */ }
+  }
+  return { ...readLocalModelSettings(), gpuAvailable: detectGpu(), gpuActive: localModelGpuActive }
 })
 
 function launchUninstaller() {
@@ -447,7 +522,9 @@ function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null })
   const contents = mainWindow.webContents
   contents.on('ipc-message', (_event, channel) => {
-    if (channel === 'open-local-ai') void mainWindow.loadFile(localAiFile)
+    if (channel === 'open-local-ai') {
+      void contents.executeJavaScript("history.pushState({}, '', '/local-ai'); window.dispatchEvent(new PopStateEvent('popstate'))")
+    }
     if (channel === 'open-website') void goHome()
   })
   contents.on('will-attach-webview', (event) => event.preventDefault())

@@ -4,6 +4,8 @@ declare global {
       platform: string
       getLocalModelStatus?: () => Promise<LocalModelStatus>
       installLocalModel?: () => Promise<LocalModelStatus & { error?: string }>
+      getLocalModelSettings?: () => Promise<LocalModelSettings>
+      setLocalModelSettings?: (settings: { gpuEnabled: boolean }) => Promise<LocalModelSettings>
       onLocalModelStatus?: (callback: (status: LocalModelStatus) => void) => () => void
     }>
   }
@@ -15,6 +17,15 @@ export type LocalModelStatus = {
   downloading?: boolean
   progress?: number
   message?: string
+  gpuEnabled?: boolean
+  gpuAvailable?: boolean
+  gpuActive?: boolean
+}
+
+export type LocalModelSettings = {
+  gpuEnabled: boolean
+  gpuAvailable: boolean
+  gpuActive: boolean
 }
 
 // Electron's user agent also lets already-installed clients use the Vue layout.

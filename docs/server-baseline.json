@@ -1,5 +1,5 @@
 {
-  "capturedOn": "2026-10-06",
+  "capturedOn": "2026-10-18",
   "timezone": "Asia/Shanghai",
   "productionOrigin": "https://www.muyewhisper.cn",
   "backendDirectory": "/work/StockAnalyzerPro",
@@ -29,7 +29,7 @@
     },
     {
       "path": "pages/chat.py",
-      "sha256": "ef59db5971278fe741b3963263c32307d21726024a167723cea8abe1baf72448",
+      "sha256": "3283a95d8b2900a6af84ba97f2aadef2f7bc70a0318ad8c90f1f4fe2739f1e9c",
       "localComparison": "identical"
     },
     {
@@ -175,18 +175,18 @@
   ],
   "webFiles": [
     {
-      "path": "assets/index-BfbyNxcG.css",
-      "sha256": "6294b5269bed56caecfba91ffee49efae1e348ebc2d5b7a77a7c185203ec8d5c",
+      "path": "assets/index-D4wAsZEx.css",
+      "sha256": "ba8c3c2655d47fe0f3b9e830ea5f5aae6eb342d61fc2e29aa83612b55230cc12",
       "localBuildMatches": true
     },
     {
-      "path": "assets/index-DePOa-I9.js",
-      "sha256": "8ac198eef9d74f14938187685a3669561170979b7cfd962c6d7b9b23caf4f8e1",
+      "path": "assets/index-C0_oIN7M.js",
+      "sha256": "1820885db6eb19e6f9a40c7a8285b8ab1ea3756f0caf33241b187700a60e2f9b",
       "localBuildMatches": true
     },
     {
       "path": "index.html",
-      "sha256": "201556298e1187c6bc2352a431f5fcda68ae81a7273df21b892d14ad9006da61",
+      "sha256": "d2631cf6ca02865918b7cb0bdc177e93b649883ebc22971730880ca22b472f1f",
       "localBuildMatches": true
     },
     {

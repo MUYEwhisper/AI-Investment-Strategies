@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('aiInvestmentDesktop', Object.freeze({
   openWebsite: () => ipcRenderer.send('open-website'),
   getLocalModelStatus: () => ipcRenderer.invoke('local-model-status'),
   installLocalModel: () => ipcRenderer.invoke('install-local-model'),
+  getLocalModelSettings: () => ipcRenderer.invoke('local-model-settings'),
+  setLocalModelSettings: (settings) => ipcRenderer.invoke('set-local-model-settings', settings),
   onLocalModelStatus: (callback) => {
     const listener = (_event, status) => callback(status)
     ipcRenderer.on('local-model-status', listener)

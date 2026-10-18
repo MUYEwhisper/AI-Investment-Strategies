@@ -52,7 +52,15 @@ type ChatSession = {
   messages: ChatMessage[]
 }
 
+type LocalChatSession = {
+  id: string
+  title: string
+  createdAt: string
+  messages: ChatMessage[]
+}
+
 const STORAGE_KEY = 'ai_invest_chat_history'
+const LOCAL_CHATS_STORAGE_KEY = 'ai_invest_local_chats'
 const WATCHLIST_STORAGE_KEY = 'ai_invest_watchlist'
 const AI_CHAT_ENDPOINT = (import.meta.env.VITE_AI_CHAT_ENDPOINT as string | undefined) ?? '/chat/endpoint'
 const LOCAL_CHAT_ENDPOINT = 'http://127.0.0.1:8001/chat/local/endpoint'
@@ -64,6 +72,7 @@ authStore.hydrate()
 const authConfig = ref(getKsuserAuthConfig())
 
 const messagesPanelRef = ref<HTMLElement | null>(null)
+const localMessagesPanelRef = ref<HTMLElement | null>(null)
 
 const stockInput = ref('')
 const chatInput = ref('')
@@ -84,6 +93,14 @@ const useThinking = ref(true)
 const streamHint = ref('')
 const localMessages = ref<ChatMessage[]>([])
 const localInput = ref('')
+const localChats = ref<LocalChatSession[]>([])
+const localActiveChatId = ref<string | null>(null)
+const localIsResponding = ref(false)
+const localShouldStickToLatestMessage = ref(true)
+const localGpuEnabled = ref(false)
+const localGpuAvailable = ref(false)
+const localGpuActive = ref(false)
+const localGpuBusy = ref(false)
 const localModelStatus = ref<'checking' | 'ready' | 'loading' | 'unavailable'>('checking')
 const localModelError = ref('')
 const localModelInstalled = ref(false)
@@ -97,9 +114,17 @@ const localModelSetupText = computed(() => localModelDownloading.value
 const localModelStatusText = computed(() => ({
   checking: '检查本地模型', ready: '本机模型就绪', loading: '本机推理中', unavailable: '模型未就绪',
 })[localModelStatus.value])
+const localActiveChat = computed(() => localChats.value.find((chat) => chat.id === localActiveChatId.value) ?? null)
+const localGpuStatusText = computed(() => {
+  if (!localGpuAvailable.value) return 'GPU 不可用，使用 CPU'
+  if (localGpuBusy.value) return '正在切换 GPU 加速…'
+  if (localGpuActive.value) return 'GPU 加速运行中'
+  return 'GPU 加速未启用'
+})
 const shouldStickToLatestMessage = ref(true)
 
 let activeAiAbortController: AbortController | null = null
+let removeLocalModelStatusListener: (() => void) | undefined
 
 const watchlist = ref<Stock[]>(createDefaultWatchlist())
 const sectorData = ref<SectorOverviewPayload>(createEmptySectorOverview())
@@ -1080,6 +1105,126 @@ function applyLocalModelStatus(status: LocalModelStatus): void {
   localModelProgress.value = status.progress || 0
   localModelStatus.value = status.running ? 'ready' : status.downloading ? 'loading' : 'unavailable'
   localModelError.value = status.running || status.downloading ? '' : status.message || ''
+  localGpuEnabled.value = Boolean(status.gpuEnabled)
+  localGpuAvailable.value = Boolean(status.gpuAvailable)
+  localGpuActive.value = Boolean(status.gpuActive)
+}
+
+function persistLocalChats(): void {
+  try {
+    localStorage.setItem(LOCAL_CHATS_STORAGE_KEY, JSON.stringify(localChats.value))
+  } catch {
+    // Local history is best effort when storage is unavailable or full.
+  }
+}
+
+function createLocalChat(select = true): void {
+  const id = createUid('local-chat')
+  localChats.value.unshift({
+    id,
+    title: '本地智投会话',
+    createdAt: new Date().toLocaleString(),
+    messages: [{ role: 'ai', content: '你好，我是本地智投。请提出投资相关问题，我会在本机按结构化格式回答。' }],
+  })
+  if (select) {
+    localActiveChatId.value = id
+    localMessages.value = localChats.value[0]?.messages ?? []
+    localShouldStickToLatestMessage.value = true
+    scrollLocalMessagesToBottom(true)
+  }
+  persistLocalChats()
+}
+
+function loadLocalChats(): void {
+  let parsed: LocalChatSession[] = []
+  try {
+    const raw = localStorage.getItem(LOCAL_CHATS_STORAGE_KEY)
+    const value = raw ? JSON.parse(raw) : []
+    if (Array.isArray(value)) parsed = value.filter((chat) => chat && typeof chat.id === 'string' && Array.isArray(chat.messages))
+  } catch {
+    parsed = []
+  }
+  localChats.value = parsed.map((chat) => ({
+    id: chat.id,
+    title: chat.title || '本地智投会话',
+    createdAt: chat.createdAt || new Date().toLocaleString(),
+    messages: chat.messages.length ? chat.messages : [{ role: 'ai', content: '你好，我是本地智投。' }],
+  }))
+  if (!localChats.value.length) createLocalChat(false)
+  const first = localChats.value[0]
+  if (first) {
+    localActiveChatId.value = first.id
+    localMessages.value = first.messages
+  }
+  localShouldStickToLatestMessage.value = true
+  scrollLocalMessagesToBottom(true)
+}
+
+function scrollLocalMessagesToBottom(force = false): void {
+  nextTick(() => {
+    const panel = localMessagesPanelRef.value
+    if (!panel || (!force && !localShouldStickToLatestMessage.value)) return
+    panel.scrollTop = panel.scrollHeight
+  })
+}
+
+function handleLocalMessagesScroll(): void {
+  const panel = localMessagesPanelRef.value
+  if (!panel) return
+  localShouldStickToLatestMessage.value = panel.scrollHeight - panel.scrollTop - panel.clientHeight <= 24
+}
+
+function switchLocalChat(chatId: string): void {
+  if (localIsResponding.value || chatId === localActiveChatId.value) return
+  const chat = localChats.value.find((item) => item.id === chatId)
+  if (!chat) return
+  localActiveChatId.value = chat.id
+  localMessages.value = chat.messages
+  localShouldStickToLatestMessage.value = true
+  scrollLocalMessagesToBottom(true)
+}
+
+function deleteLocalChat(chatId: string): void {
+  if (localIsResponding.value) return
+  localChats.value = localChats.value.filter((chat) => chat.id !== chatId)
+  if (localActiveChatId.value === chatId) {
+    const next = localChats.value[0]
+    if (next) {
+      localActiveChatId.value = next.id
+      localMessages.value = next.messages
+    } else {
+      createLocalChat()
+      return
+    }
+  }
+  persistLocalChats()
+}
+
+async function loadLocalGpuSettings(): Promise<void> {
+  const settings = await window.aiInvestmentDesktop?.getLocalModelSettings?.()
+  if (!settings) return
+  localGpuEnabled.value = Boolean(settings.gpuEnabled)
+  localGpuAvailable.value = Boolean(settings.gpuAvailable)
+  localGpuActive.value = Boolean(settings.gpuActive)
+}
+
+async function toggleLocalGpu(): Promise<void> {
+  if (!localGpuAvailable.value || localGpuBusy.value) return
+  localGpuBusy.value = true
+  localModelError.value = ''
+  try {
+    const settings = await window.aiInvestmentDesktop?.setLocalModelSettings?.({ gpuEnabled: !localGpuEnabled.value })
+    if (settings) {
+      localGpuEnabled.value = Boolean(settings.gpuEnabled)
+      localGpuAvailable.value = Boolean(settings.gpuAvailable)
+      localGpuActive.value = Boolean(settings.gpuActive)
+    }
+    await checkLocalModel()
+  } catch (error) {
+    localModelError.value = error instanceof Error ? error.message : 'GPU 设置切换失败。'
+  } finally {
+    localGpuBusy.value = false
+  }
 }
 
 async function installLocalModel(): Promise<void> {
@@ -1108,11 +1253,13 @@ function onLocalInputKeydown(event: KeyboardEvent): void {
 
 async function sendLocalMessage(): Promise<void> {
   const prompt = localInput.value.trim()
-  if (!prompt || localModelStatus.value === 'loading') return
+  if (!prompt || localIsResponding.value || localModelStatus.value !== 'ready') return
+  if (!localActiveChat.value) createLocalChat()
   localMessages.value.push({ role: 'user', content: prompt }, { role: 'ai', content: '' })
   const answer = localMessages.value[localMessages.value.length - 1]
   if (!answer) return
   localInput.value = ''
+  localIsResponding.value = true
   localModelStatus.value = 'loading'
   localModelError.value = ''
   try {
@@ -1128,7 +1275,7 @@ async function sendLocalMessage(): Promise<void> {
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
       body: JSON.stringify({
         agentId: PRIMARY_AGENT_ID,
-        systemPrompt: DEFAULT_AGENT.systemPrompt,
+        systemPrompt: DEFAULT_AGENT.systemPrompt + '\n\n请严格遵守本地智投的结构化输出规范。',
         originalPrompt: prompt,
         messages: localMessages.value.slice(0, -2).map((message) => ({ role: message.role === 'ai' ? 'assistant' : 'user', content: message.content })),
         mcpContext: mcpData.records || [],
@@ -1152,10 +1299,17 @@ async function sendLocalMessage(): Promise<void> {
     }
     if (!answer.content) answer.content = '模型未返回文本内容。'
     localModelStatus.value = 'ready'
+    const chat = localActiveChat.value
+    if (chat && chat.title === '本地智投会话') chat.title = prompt.slice(0, 28)
+    persistLocalChats()
   } catch (error) {
     localMessages.value.pop()
     localModelStatus.value = 'unavailable'
     localModelError.value = error instanceof Error ? error.message : '本地模型请求失败。'
+  } finally {
+    localIsResponding.value = false
+    persistLocalChats()
+    scrollLocalMessagesToBottom(false)
   }
 }
 
@@ -1347,13 +1501,16 @@ watch(
 onMounted(() => {
   window.addEventListener('desktop-view-change', onDesktopViewChange)
   if (isDesktopClient) {
+    loadLocalChats()
+    void loadLocalGpuSettings()
     void checkLocalModel()
-    window.aiInvestmentDesktop?.onLocalModelStatus?.(applyLocalModelStatus)
+    removeLocalModelStatusListener = window.aiInvestmentDesktop?.onLocalModelStatus?.(applyLocalModelStatus)
   }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('desktop-view-change', onDesktopViewChange)
+  removeLocalModelStatusListener?.()
   activeAiAbortController?.abort()
 })
 </script>
@@ -1489,38 +1646,81 @@ onBeforeUnmount(() => {
             @refresh-sessions="refreshAccountSessions"
           />
 
-          <section v-else-if="isLocalAiRoute" class="local-ai-workspace">
-            <section class="panel local-ai-chat-panel">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">本地智投问答</div>
-                  <div class="panel-subtitle">DeepSeek-R1-Distill-Qwen-1.5B · 本机推理</div>
-                </div>
-                <span class="local-model-status" :class="localModelStatus">{{ localModelStatusText }}</span>
+          <section v-else-if="isLocalAiRoute" class="panel chat-panel local-ai-chat-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">本地智投</div>
+                <div class="panel-subtitle">DeepSeek-R1-Distill-Qwen-1.5B · 本机推理，数据按需接入 MCP</div>
               </div>
-              <div v-if="localModelStatus === 'unavailable' || localModelDownloading" class="local-model-setup">
-                <div class="local-model-setup-copy">
-                  <strong>{{ localModelDownloading ? '正在安装本地模型' : localModelInstalled ? '本地推理服务未运行' : '本地模型尚未安装' }}</strong>
-                  <span>{{ localModelSetupText }}</span>
-                  <progress v-if="localModelDownloading" max="100" :value="localModelProgress"></progress>
-                </div>
-                <button class="btn primary" type="button" :disabled="localModelDownloading" @click="installLocalModel">
-                  {{ localModelDownloading ? '正在安装...' : localModelInstalled ? '启动本地模型' : '安装本地模型' }}
-                </button>
+              <span class="local-model-status" :class="localModelStatus">{{ localModelStatusText }}</span>
+            </div>
+            <div v-if="localModelStatus === 'unavailable' || localModelDownloading" class="local-model-setup">
+              <div class="local-model-setup-copy">
+                <strong>{{ localModelDownloading ? '正在安装本地模型' : localModelInstalled ? '本地推理服务未运行' : '本地模型尚未安装' }}</strong>
+                <span>{{ localModelSetupText }}</span>
+                <progress v-if="localModelDownloading" max="100" :value="localModelProgress"></progress>
               </div>
-              <div class="local-ai-messages" aria-live="polite">
-                <div v-for="(message, index) in localMessages" :key="index" class="local-ai-message" :class="message.role">
-                  <div v-if="message.role === 'ai'" v-html="renderAiMessage(message.content)"></div>
-                  <div v-else>{{ message.content }}</div>
+              <button class="btn primary" type="button" :disabled="localModelDownloading" @click="installLocalModel">
+                {{ localModelDownloading ? '正在安装...' : localModelInstalled ? '启动本地模型' : '安装本地模型' }}
+              </button>
+            </div>
+            <div class="chat-main">
+              <aside class="chat-sidebar">
+                <div class="chat-sidebar-section agent-section">
+                  <div class="agent-focus active">
+                    <span class="agent-focus-name">本地智投</span>
+                    <span class="agent-focus-subtitle">Local SmartQ</span>
+                    <span class="agent-focus-desc">结构化回答投资问题，内容保存在本机。</span>
+                  </div>
                 </div>
-                <div v-if="!localMessages.length" class="local-ai-empty">你好，我是本地智投问答。提出问题后，我会在本机运行模型，并按需查询投资 MCP 数据。</div>
+                <div class="chat-sidebar-section history-section">
+                  <div class="history-head">
+                    <strong style="font-size: 13px">本地历史会话</strong>
+                    <button class="btn history-new-btn" type="button" :disabled="localIsResponding" @click="createLocalChat()">新建</button>
+                  </div>
+                  <div class="history-list" id="localHistoryList">
+                    <div
+                      v-for="chat in localChats"
+                      :key="chat.id"
+                      class="history-item"
+                      :class="{ active: chat.id === localActiveChatId }"
+                      @click="switchLocalChat(chat.id)"
+                    >
+                      <div class="history-meta">
+                        <div class="history-title">{{ chat.title }}</div>
+                        <div class="history-time">{{ chat.createdAt }}</div>
+                      </div>
+                      <button class="btn row-action-btn sidebar-delete-btn" type="button" :disabled="localIsResponding" @click.stop="deleteLocalChat(chat.id)">删除</button>
+                    </div>
+                    <div v-if="!localChats.length" class="history-empty">暂无本地历史会话，点击新建开始。</div>
+                  </div>
+                </div>
+              </aside>
+              <div class="chat-body">
+                <div class="chat-status">
+                  <span class="agent-badge">当前智能体：本地智投</span>
+                  <label class="thinking-toggle local-gpu-toggle" :title="localGpuAvailable ? '切换本地模型 GPU 加速' : '未检测到可用 NVIDIA GPU'">
+                    <input type="checkbox" :checked="localGpuEnabled" :disabled="!localGpuAvailable || localGpuBusy" @change="toggleLocalGpu" />
+                    启用 GPU 加速
+                  </label>
+                  <span class="local-gpu-status">{{ localGpuStatusText }}</span>
+                  <span class="status-text">{{ localIsResponding ? '正在生成回复...' : localModelError || '就绪' }}</span>
+                </div>
+                <div ref="localMessagesPanelRef" class="messages" id="localMessages" @scroll="handleLocalMessagesScroll">
+                  <div class="message-list">
+                    <div v-for="(message, index) in localMessages" :key="(localActiveChatId || 'local-chat') + '_' + index" class="msg" :class="{ user: message.role === 'user', ai: message.role === 'ai' }">
+                      <div v-if="message.role === 'ai'" class="msg-markdown" v-html="renderAiMessage(message.content)"></div>
+                      <div v-else class="msg-text">{{ message.content }}</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="chat-input-wrap">
+                  <textarea v-model="localInput" :disabled="localIsResponding || localModelStatus !== 'ready'" placeholder="输入投资相关问题" @keydown="onLocalInputKeydown"></textarea>
+                  <button class="btn primary" type="button" :disabled="!localInput.trim() || localIsResponding || localModelStatus !== 'ready'" @click="sendLocalMessage">{{ localIsResponding ? '生成中...' : '发送' }}</button>
+                </div>
+                <div v-if="localModelError" class="local-ai-error">{{ localModelError }}</div>
               </div>
-              <form class="local-ai-composer" @submit.prevent="sendLocalMessage">
-                <textarea v-model="localInput" :disabled="localModelStatus === 'loading'" placeholder="输入投资相关问题" @keydown="onLocalInputKeydown"></textarea>
-                <button class="btn primary" type="submit" :disabled="!localInput.trim() || localModelStatus === 'loading'">{{ localModelStatus === 'loading' ? '生成中...' : '发送' }}</button>
-              </form>
-              <div v-if="localModelError" class="local-ai-error">{{ localModelError }}</div>
-            </section>
+            </div>
           </section>
 
           <template v-else>
