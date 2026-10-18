@@ -93,9 +93,9 @@ async function applyDesktopShell(contents) {
             '<nav class="desktop-sidebar-nav" aria-label="工作区导航">',
             '<button class="desktop-sidebar-item" type="button" data-route="market">市场总览</button>',
             '<button class="desktop-sidebar-item" type="button" data-route="ai">AI 投顾</button>',
-            '<button class="desktop-sidebar-item" type="button" data-route="local-ai">本地智投</button>',
             '<button class="desktop-sidebar-item" type="button" data-route="strategy">策略工作台</button>',
             '<button class="desktop-sidebar-item" type="button" data-route="account">账号中心</button>',
+            '<button class="desktop-sidebar-item" type="button" data-route="local-ai">本地智投</button>',
             '</nav>',
             '<div class="desktop-sidebar-foot"><div class="desktop-sidebar-status" data-desktop-session>游客 · 云端已连接</div><div class="desktop-sidebar-version">Windows 64 位客户端</div></div>',
           ].join('')
@@ -141,6 +141,10 @@ async function applyDesktopShell(contents) {
           localItem.dataset.route = 'local-ai'
           localItem.textContent = '本地智投'
           nav.appendChild(localItem)
+        }
+        const localNav = sidebar.querySelector('.desktop-sidebar-nav')
+        if (localNav && localItem.parentElement === localNav && localNav.lastElementChild !== localItem) {
+          localNav.appendChild(localItem)
         }
         if (!localItem.dataset.localAiHandler) {
           localItem.dataset.localAiHandler = 'installed'

@@ -6,89 +6,292 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src http://127.0.0.1:8001 https://www.muyewhisper.cn https://muyewhisper.cn; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
   <title>本地智投</title>
   <style>
-    :root { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; color: #172b3a; background: #f1f5f9; }
+    :root { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; color: #17283e; background: #e9eef4; font-synthesis: none; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; }
-    .shell { min-height: 100vh; display: flex; flex-direction: column; }
-    header { height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; background: #fff; border-bottom: 1px solid #dbe5ed; }
-    .brand { font-size: 20px; font-weight: 700; } .sub { color: #718193; font-size: 12px; margin-top: 4px; }
-    button { border: 1px solid #c4d2df; border-radius: 6px; background: #fff; color: #25465d; padding: 9px 14px; cursor: pointer; font: inherit; }
-    button.primary { color: #fff; background: #256b91; border-color: #256b91; } button:disabled { opacity: .55; cursor: default; }
-    main { width: min(1040px, calc(100% - 48px)); flex: 1; margin: 24px auto; display: flex; }
-    .panel { display: flex; flex: 1; min-height: calc(100vh - 144px); flex-direction: column; background: #fff; border: 1px solid #dbe5ed; border-radius: 8px; overflow: hidden; }
-    .panel-head { padding: 22px 24px 16px; display: flex; justify-content: space-between; align-items: start; border-bottom: 1px solid #e6edf2; gap: 16px; }
-    h1 { margin: 0; font-size: 22px; } .model { color: #718193; font-size: 13px; margin-top: 6px; }
-    .status { font-size: 13px; padding: 5px 9px; border: 1px solid #c9d7e5; border-radius: 4px; color: #718193; } .status.ready { color: #27754d; background: #f2fbf5; border-color: #9bd5b6; } .status.error { color: #a33e3e; background: #fff7f7; border-color: #e2b4b4; }
-    .messages { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 22px 24px; overflow: auto; }
-    .setup { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: #f7fafc; border-bottom: 1px solid #e6edf2; }
-    .setup-copy { min-width: 0; flex: 1; color: #526779; font-size: 13px; line-height: 1.5; }
-    .setup-copy strong { display: block; color: #25465d; font-size: 14px; }
-    .setup-action { flex: 0 0 auto; }
-    progress { width: 100%; height: 6px; display: block; margin-top: 8px; accent-color: #256b91; }
-    @media (max-width: 620px) { header { padding: 0 16px; } main { width: calc(100% - 24px); margin: 12px auto; } .panel { min-height: calc(100vh - 96px); } .panel-head { padding: 16px; } .setup { align-items: stretch; padding: 14px 16px; flex-direction: column; gap: 10px; } .setup-action { width: 100%; } .messages { padding: 16px; } form { padding: 12px 16px; } }
-    .message, .empty { max-width: min(800px, 88%); padding: 12px 15px; border: 1px solid #dbe5ed; border-radius: 6px; white-space: pre-wrap; line-height: 1.65; } .message.user { align-self: flex-end; background: #edf4f9; border-color: #bfd4e6; } .message.ai, .empty { align-self: flex-start; } .empty { color: #718193; }
-    form { display: flex; align-items: end; gap: 12px; padding: 16px 24px; border-top: 1px solid #e6edf2; } textarea { flex: 1; min-height: 58px; max-height: 180px; resize: vertical; padding: 11px; border: 1px solid #c4d2df; border-radius: 6px; font: inherit; line-height: 1.5; } .error { padding: 0 24px 15px; color: #a33e3e; font-size: 13px; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    button, textarea { font: inherit; }
+    button { min-height: 34px; padding: 0 11px; border: 1px solid #c9d7e5; border-radius: 6px; color: #304861; background: #fff; cursor: pointer; transition: background .16s ease, border-color .16s ease, transform .16s ease; }
+    button:hover:not(:disabled) { border-color: #77add6; background: #eef7ff; }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:disabled { opacity: .55; cursor: default; }
+    button.primary { border-color: #2f76b5; color: #fff; background: #2f76b5; }
+    button.primary:hover:not(:disabled) { background: #256397; }
+    .shell { display: flex; width: 100%; height: 100%; flex-direction: column; padding: 18px; gap: 14px; opacity: 0; transform: translateY(12px) scale(.99); }
+    body.ready .shell { animation: workspace-in .32s cubic-bezier(.2,.7,.2,1) forwards; }
+    body.leaving .shell { animation: workspace-out .2s ease-in forwards; pointer-events: none; }
+    @keyframes workspace-in { to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes workspace-out { to { opacity: 0; transform: translateY(-8px) scale(.995); } }
+    .topbar { display: flex; flex: 0 0 66px; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 16px; border: 1px solid #d5dee8; border-radius: 8px; background: #fff; box-shadow: 0 4px 14px rgba(26,48,73,.08); }
+    .brand { min-width: 0; }
+    .brand strong { display: block; color: #1e3852; font-size: 17px; }
+    .brand span { display: block; margin-top: 3px; color: #6b7b8f; font-size: 11px; }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+    .model-status { padding: 5px 9px; border: 1px solid #c9d7e5; border-radius: 999px; color: #536b83; font-size: 11px; white-space: nowrap; }
+    .model-status.ready { border-color: #9bd5b6; color: #27754d; background: #f2fbf5; }
+    .model-status.busy { border-color: #9bc8e7; color: #17649c; background: #eef7ff; }
+    .model-status.error { border-color: #e2b4b4; color: #a33e3e; background: #fff7f7; }
+    .workspace { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); gap: 12px; }
+    .sidebar, .chat { min-width: 0; min-height: 0; border: 1px solid #d5dee8; border-radius: 8px; background: #fff; box-shadow: 0 4px 14px rgba(26,48,73,.07); }
+    .sidebar { display: flex; flex-direction: column; overflow: hidden; }
+    .agent-card { margin: 12px; padding: 12px; border: 1px solid #8bb7d6; border-radius: 7px; background: #eef5fa; }
+    .agent-card strong { display: block; color: #1e3852; font-size: 14px; }
+    .agent-card span { display: block; margin-top: 5px; color: #6b7b8f; font-size: 11px; line-height: 1.5; }
+    .history-head { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; border-top: 1px solid #e5ebf1; border-bottom: 1px solid #e5ebf1; background: #f7f9fb; }
+    .history-head strong { color: #334b63; font-size: 12px; }
+    .history-head button { min-height: 29px; padding: 0 9px; font-size: 11px; }
+    .history-list { min-height: 0; flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: #b8c9da transparent; }
+    .history-item { display: flex; min-width: 0; align-items: center; gap: 5px; margin-bottom: 5px; padding: 8px; border: 1px solid transparent; border-radius: 6px; cursor: pointer; animation: history-in .2s ease both; }
+    @keyframes history-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .history-item:hover { background: #f1f6fa; }
+    .history-item.active { border-color: #a9c8df; background: #eef5fa; }
+    .history-meta { min-width: 0; flex: 1; }
+    .history-title { overflow: hidden; color: #304861; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .history-time { overflow: hidden; margin-top: 4px; color: #8a99a9; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .history-delete { min-height: 26px; flex: 0 0 auto; padding: 0 6px; color: #7a8794; font-size: 10px; }
+    .history-empty { padding: 12px 8px; color: #8492a0; font-size: 11px; line-height: 1.5; }
+    .chat { display: flex; flex-direction: column; overflow: hidden; }
+    .chat-toolbar { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid #d5dee8; background: #f7f9fb; }
+    .chat-toolbar .caption { overflow: hidden; color: #536b83; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .gpu-control { display: flex; flex: 0 0 auto; align-items: center; gap: 7px; color: #48627a; font-size: 11px; white-space: nowrap; }
+    .gpu-control input { accent-color: #2f76b5; }
+    .messages { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 14px; overflow-y: auto; overscroll-behavior: contain; padding: 20px clamp(14px, 3vw, 34px); scrollbar-width: thin; scrollbar-color: #b8c9da transparent; }
+    .message { width: fit-content; max-width: min(94%, 1000px); padding: 11px 14px; border: 1px solid #d5dee8; border-radius: 8px; color: #253d54; background: #fff; font-size: 13px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; animation: message-in .2s ease both; }
+    .message.user { align-self: flex-end; border-color: #bfd4e6; background: #edf4f9; }
+    .message.ai { align-self: flex-start; }
+    .message.ai h { color: #1e3852; }
+    .message.pending { color: #8492a0; }
+    @keyframes message-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    .setup { display: flex; align-items: center; gap: 14px; padding: 11px 14px; border-bottom: 1px solid #e5ebf1; background: #f7fafc; }
+    .setup[hidden] { display: none; }
+    .setup-copy { min-width: 0; flex: 1; color: #6b7b8f; font-size: 11px; line-height: 1.5; }
+    .setup-copy strong { display: block; color: #334b63; font-size: 12px; }
+    .setup-copy progress { display: block; width: 100%; height: 5px; margin-top: 6px; accent-color: #2f76b5; }
+    .setup button { flex: 0 0 auto; }
+    .composer-wrap { padding: 12px 14px 8px; border-top: 1px solid #e5ebf1; }
+    form { display: flex; align-items: flex-end; gap: 9px; }
+    textarea { min-width: 0; min-height: 54px; max-height: 150px; flex: 1; resize: none; padding: 10px 11px; border: 1px solid #ccd9e5; border-radius: 6px; outline: none; color: #253d54; background: #fff; font-size: 13px; line-height: 1.55; }
+    textarea:focus { border-color: #5d9bca; box-shadow: 0 0 0 3px rgba(47,118,181,.12); }
+    .error { min-height: 0; padding: 0 14px 10px; color: #a33e3e; font-size: 11px; }
+    .error:empty { display: none; }
+    @media (max-width: 760px) {
+      .shell { padding: 10px; gap: 9px; }
+      .workspace { grid-template-columns: 190px minmax(0,1fr); gap: 8px; }
+      .topbar { min-height: 56px; flex-basis: 56px; padding: 8px 10px; }
+      .brand strong { font-size: 14px; }
+      .brand span { display: none; }
+      .model-status { font-size: 10px; }
+      .sidebar { max-height: 100%; }
+      .agent-card { margin: 8px; padding: 9px; }
+      .history-head { padding: 0 8px; }
+      .history-item { padding: 6px; }
+      .chat-toolbar { align-items: flex-start; flex-direction: column; gap: 5px; }
+      .messages { padding: 14px 10px; }
+      .message { max-width: 98%; padding: 9px 10px; font-size: 12px; }
+      .setup { align-items: stretch; flex-direction: column; }
+    }
+    @media (max-width: 540px) {
+      .workspace { grid-template-columns: 1fr; grid-template-rows: minmax(100px, 26%) minmax(0,1fr); }
+      .sidebar { display: grid; grid-template-columns: minmax(110px, 38%) minmax(0,1fr); }
+      .agent-card { align-self: start; }
+      .history-head { grid-column: 2; grid-row: 1; }
+      .history-list { grid-column: 2; grid-row: 2; }
+      .history-item { margin-bottom: 2px; }
+      .history-time { display: none; }
+      #back { min-height: 30px; padding: 0 7px; font-size: 10px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
   </style>
 </head>
 <body>
   <div class="shell">
-    <header><div><div class="brand">智能投资平台</div><div class="sub">本地智投 · 仅保留智投问答</div></div><button id="back">返回云端工作台</button></header>
-    <main><section class="panel"><div class="panel-head"><div><h1>本地智投问答</h1><div class="model">DeepSeek-R1-Distill-Qwen-1.5B · 本机推理 · 与云端使用同一 MCP 数据源</div></div><span id="status" class="status">检查本地模型</span></div><div id="setup" class="setup" hidden><div class="setup-copy"><strong id="setupTitle">本地模型尚未安装</strong><span id="setupMessage">点击后将从 ModelScope 下载模型至本机，并自动启动本地推理服务。</span><progress id="installProgress" max="100" value="0" hidden></progress></div><button id="installModel" class="primary setup-action" type="button">安装本地模型</button></div><div id="messages" class="messages"><div class="empty">你好，我是本地智投问答。提出投资问题后，我会在本机运行模型，并按需查询投资 MCP 数据。</div></div><form id="composer"><textarea id="input" placeholder="输入投资相关问题" aria-label="投资问题"></textarea><button id="send" class="primary" type="submit">发送</button></form><div id="error" class="error" hidden></div></section></main>
+    <header class="topbar">
+      <div class="brand"><strong>本地智投</strong><span>DeepSeek-R1-Distill-Qwen-1.5B · 本机推理</span></div>
+      <div class="topbar-actions"><span id="status" class="model-status">检查本地模型</span><button id="back" type="button">返回工作台</button></div>
+    </header>
+    <main class="workspace">
+      <aside class="sidebar" aria-label="本地智投会话">
+        <div class="agent-card"><strong>智投问答</strong><span>在本机分析投资问题，回答会保存在此设备。</span></div>
+        <div class="history-head"><strong>历史对话</strong><button id="newChat" type="button">新建对话</button></div>
+        <div id="historyList" class="history-list"></div>
+      </aside>
+      <section class="chat" aria-label="本地智投聊天">
+        <div id="setup" class="setup" hidden>
+          <div class="setup-copy"><strong id="setupTitle">本地模型尚未安装</strong><span id="setupMessage">点击后从 ModelScope 下载并配置本地模型。</span><progress id="installProgress" max="100" value="0" hidden></progress></div>
+          <button id="installModel" class="primary" type="button">安装本地模型</button>
+        </div>
+        <div class="chat-toolbar">
+          <span class="caption">本地推理 · 投资数据按需通过 MCP 查询</span>
+          <label class="gpu-control" title="启用后模型会优先使用可用的 NVIDIA 显卡。"><input id="gpuToggle" type="checkbox" disabled>GPU 加速 <span id="gpuStatus">检测中</span></label>
+        </div>
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <div class="composer-wrap"><form id="composer"><textarea id="input" placeholder="输入投资相关问题，Enter 发送，Shift+Enter 换行" aria-label="投资问题"></textarea><button id="send" class="primary" type="submit">发送</button></form></div>
+        <div id="error" class="error" role="status"></div>
+      </section>
+    </main>
   </div>
   <script>
     const SITE = 'https://www.muyewhisper.cn'
-    const state = { messages: [], busy: false }
+    const STORAGE_KEY = 'ai_invest_local_chats'
+    const GREETING = '你好，我是本地智投。请提出投资相关问题，我会按“结论、分析依据、风险提示”的结构回答。'
+    const OUTPUT_RULES = `你是本地版智投问答，只回答用户提出的投资问题。必须使用中文，并严格按以下结构输出：
+### 结论
+先给出简洁、客观的结论。
+### 分析依据
+列出不超过4条与结论直接相关的依据；只使用用户提供或 MCP 明确给出的数据，数据不足时明确说明。
+### 风险提示
+说明关键不确定性和需要关注的风险，最后写“以上内容仅供参考，不构成投资建议。投资有风险，决策请结合自身情况审慎判断。”
+不自我介绍，不重复用户问题，不输出思维过程或<think>标签；不虚构数据，不承诺收益，不给出绝对化买卖指令；回答控制在700字以内。`
+    const state = { chats: [], activeId: null, busy: false, stickToBottom: true, model: { installed: false, running: false, downloading: false, progress: 0 }, gpu: { gpuEnabled: false, gpuAvailable: false, gpuActive: false } }
     const $ = (id) => document.getElementById(id)
-    const status = (text, kind = '') => { $('status').textContent = text; $('status').className = 'status ' + kind }
-    const showError = (text) => { $('error').textContent = text; $('error').hidden = !text }
-    const addMessage = (role, content) => { const node = document.createElement('div'); node.className = 'message ' + role; node.textContent = content; $('messages').appendChild(node); $('messages').scrollTop = $('messages').scrollHeight; return node }
-    let modelState = { installed: false, running: false, downloading: false, progress: 0 }
-    function renderModelState(next) {
-      modelState = next
-      const unavailable = !next.installed || !next.running
+    const uid = () => `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const activeChat = () => state.chats.find((chat) => chat.id === state.activeId)
+    const setStatus = (text, kind = '') => { $('status').textContent = text; $('status').className = `model-status ${kind}` }
+    const setError = (text = '') => { $('error').textContent = text }
+    function persist() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.chats)) } catch { setError('本地存储空间不足，当前会话暂未保存。') }
+    }
+    function safeChats() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+        return Array.isArray(parsed) ? parsed.filter((chat) => chat && typeof chat.id === 'string' && Array.isArray(chat.messages)) : []
+      } catch { return [] }
+    }
+    function createChat(select = true) {
+      const chat = { id: uid(), title: '新对话', createdAt: new Date().toLocaleString(), messages: [{ role: 'assistant', content: GREETING }] }
+      state.chats.unshift(chat)
+      if (select) state.activeId = chat.id
+      persist(); renderHistory(); if (select) renderMessages(true)
+    }
+    function selectChat(id) {
+      if (state.busy || state.activeId === id) return
+      if (!state.chats.some((chat) => chat.id === id)) return
+      state.activeId = id; state.stickToBottom = true; renderHistory(); renderMessages(true)
+    }
+    function deleteChat(id) {
+      if (state.busy) return
+      state.chats = state.chats.filter((chat) => chat.id !== id)
+      if (state.activeId === id) state.activeId = state.chats[0]?.id || null
+      if (!state.activeId) { createChat(); return }
+      persist(); renderHistory(); renderMessages(true)
+    }
+    function renderHistory() {
+      const list = $('historyList'); list.replaceChildren()
+      if (!state.chats.length) { const empty = document.createElement('div'); empty.className = 'history-empty'; empty.textContent = '暂无历史对话。'; list.append(empty); return }
+      for (const chat of state.chats) {
+        const row = document.createElement('div'); row.className = `history-item${chat.id === state.activeId ? ' active' : ''}`; row.tabIndex = 0; row.setAttribute('role', 'button'); row.setAttribute('aria-current', chat.id === state.activeId ? 'true' : 'false')
+        const meta = document.createElement('div'); meta.className = 'history-meta'
+        const title = document.createElement('div'); title.className = 'history-title'; title.textContent = chat.title || '本地智投会话'
+        const time = document.createElement('div'); time.className = 'history-time'; time.textContent = chat.createdAt || ''
+        meta.append(title, time)
+        const remove = document.createElement('button'); remove.className = 'history-delete'; remove.type = 'button'; remove.textContent = '删除'; remove.disabled = state.busy; remove.setAttribute('aria-label', `删除${title.textContent}`); remove.addEventListener('click', (event) => { event.stopPropagation(); deleteChat(chat.id) })
+        row.append(meta, remove); row.addEventListener('click', () => selectChat(chat.id)); row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectChat(chat.id) } }); list.append(row)
+      }
+    }
+    function scrollBottom(force = false) { requestAnimationFrame(() => { const panel = $('messages'); if (force || state.stickToBottom) panel.scrollTop = panel.scrollHeight }) }
+    function renderMessages(force = false) {
+      const panel = $('messages'); panel.replaceChildren()
+      const chat = activeChat()
+      for (const message of chat?.messages || []) {
+        const node = document.createElement('div'); node.className = `message ${message.role === 'user' ? 'user' : 'ai'}${message.pending ? ' pending' : ''}`; node.textContent = message.content; panel.append(node)
+      }
+      scrollBottom(force)
+    }
+    function renderModel(next) {
+      state.model = { ...state.model, ...next }
+      const model = state.model; const unavailable = !model.running
       $('setup').hidden = !unavailable
-      $('setupTitle').textContent = next.downloading ? '正在安装本地模型' : next.installed ? '本地推理服务未运行' : '本地模型尚未安装'
-      $('setupMessage').textContent = next.downloading ? next.message : next.installed ? '点击后将自动启动本地模型服务。' : '模型约 1.12GB，将从 ModelScope 下载至本机，不经过应用服务器。'
-      $('installModel').textContent = next.downloading ? '正在安装…' : next.installed ? '启动本地模型' : '安装本地模型'
-      $('installModel').disabled = Boolean(next.downloading)
-      $('installProgress').hidden = !next.downloading
-      $('installProgress').value = next.progress || 0
-      if (next.running) { status('本机模型就绪', 'ready'); showError('') }
-      else if (next.downloading) status('正在安装模型')
-      else status(next.installed ? '本地服务未启动' : '模型未安装', 'error')
+      $('setupTitle').textContent = model.downloading ? '正在安装本地模型' : model.installed ? '本地模型已安装，服务未运行' : '本地模型尚未安装'
+      $('setupMessage').textContent = model.downloading ? (model.message || `正在下载 ${model.progress || 0}%`) : model.installed ? '启动本地推理服务后即可继续对话。' : '模型约 1.12GB，将从 ModelScope 下载并安装到本机。'
+      $('installModel').textContent = model.downloading ? '正在安装…' : model.installed ? '启动本地模型' : '安装本地模型'
+      $('installModel').disabled = Boolean(model.downloading)
+      $('installProgress').hidden = !model.downloading; $('installProgress').value = model.progress || 0
+      $('input').disabled = !model.running || state.busy; $('send').disabled = !model.running || state.busy
+      if (model.running) setStatus('本机模型就绪', 'ready')
+      else if (model.downloading) setStatus('正在安装模型', 'busy')
+      else setStatus(model.installed ? '模型服务未运行' : '模型未安装', 'error')
+    }
+    function renderGpu(settings) {
+      state.gpu = { ...state.gpu, ...settings }
+      const available = Boolean(state.gpu.gpuAvailable)
+      $('gpuToggle').checked = Boolean(state.gpu.gpuEnabled)
+      $('gpuToggle').disabled = !available || state.busy
+      $('gpuStatus').textContent = !available ? '不可用' : state.gpu.gpuActive ? '运行中' : '未启用'
     }
     async function checkHealth() {
       try {
-        const response = await fetch('http://127.0.0.1:8001/health')
-        const data = await response.json()
-        if (response.ok && data.status === 'ok') { renderModelState({ ...modelState, installed: true, running: true }); return }
-      } catch { /* The service may not be installed or started yet. */ }
-      try { renderModelState(await window.aiInvestmentDesktop?.getLocalModelStatus?.() || modelState) }
-      catch { renderModelState(modelState); showError('无法读取本地模型状态。请重新启动桌面客户端后重试。') }
+        const response = await fetch('http://127.0.0.1:8001/health', { signal: AbortSignal.timeout(2500) }); const data = await response.json()
+        if (response.ok && data.status === 'ok') { renderModel({ installed: true, running: true }); await loadGpu(); return }
+      } catch { /* Desktop IPC supplies install status when no model server is available. */ }
+      try { renderModel(await window.aiInvestmentDesktop?.getLocalModelStatus?.() || {}) } catch { renderModel({}); setError('无法读取本地模型状态，请重启桌面客户端后重试。') }
+      await loadGpu()
+    }
+    async function loadGpu() {
+      try { const settings = await window.aiInvestmentDesktop?.getLocalModelSettings?.(); if (settings) renderGpu(settings) } catch { renderGpu({ gpuAvailable: false }) }
     }
     async function installModel() {
-      showError('')
+      setError(''); renderModel({ downloading: true, running: false })
       try {
         const result = await window.aiInvestmentDesktop?.installLocalModel?.()
-        if (result?.error) showError(result.error)
+        if (result?.error) setError(result.error)
+        if (result) renderModel(result)
         await checkHealth()
-      } catch (error) { showError(error instanceof Error ? error.message : '本地模型安装失败。') }
+      } catch (error) { setError(error instanceof Error ? error.message : '本地模型安装失败。'); renderModel({ downloading: false, running: false }) }
+    }
+    async function toggleGpu() {
+      $('gpuToggle').disabled = true; $('gpuStatus').textContent = '切换中'
+      try {
+        const settings = await window.aiInvestmentDesktop?.setLocalModelSettings?.({ gpuEnabled: $('gpuToggle').checked })
+        if (settings) renderGpu(settings)
+        await checkHealth()
+      } catch (error) { setError(error instanceof Error ? error.message : 'GPU 设置切换失败。'); await loadGpu() }
+      finally { $('gpuToggle').disabled = !state.gpu.gpuAvailable || state.busy }
+    }
+    function normalizeAnswer(text) {
+      let value = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<\/?think>/gi, '').trim()
+      if (!value) value = '当前未生成有效回答。'
+      if (!value.includes('### 结论')) value = `### 结论\n${value}`
+      if (!value.includes('### 风险提示')) value += '\n\n### 风险提示\n以上内容仅供参考，不构成投资建议。投资有风险，决策请结合自身情况审慎判断。'
+      return value.slice(0, 4000)
     }
     async function send(event) {
-      event.preventDefault(); const prompt = $('input').value.trim(); if (!prompt || state.busy) return
-      state.busy = true; $('input').value = ''; $('send').disabled = true; showError(''); addMessage('user', prompt); const answer = addMessage('ai', ''); status('本机推理中')
+      event.preventDefault(); const prompt = $('input').value.trim(); if (!prompt || state.busy || !state.model.running) return
+      let chat = activeChat(); if (!chat) { createChat(); chat = activeChat() }
+      const userMessage = { role: 'user', content: prompt }; const answer = { role: 'assistant', content: '正在生成回复…', pending: true }
+      chat.messages.push(userMessage, answer); if (chat.title === '新对话') chat.title = prompt.slice(0, 30); $('input').value = ''; state.busy = true; setError(''); renderHistory(); renderMessages(true); renderModel({})
       try {
         let mcpContext = []
         try { const context = await fetch(SITE + '/chat/local-context', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) }); if (context.ok) mcpContext = (await context.json()).records || [] } catch { /* MCP is optional for general questions. */ }
-        const contextText = mcpContext.length ? '\n\n以下是同一 MCP 数据源返回的事实，请只引用其中明确存在的内容：\n' + JSON.stringify(mcpContext) : ''
-        const response = await fetch('http://127.0.0.1:8001/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ model: 'DeepSeek-R1-Distill-Qwen-1.5B', stream: true, max_tokens: 512, messages: [{ role: 'system', content: '你是智投问答。请客观分析，不承诺收益。' + contextText }, ...state.messages.slice(-8), { role: 'user', content: prompt }] }) })
+        const contextText = mcpContext.length ? `\n\n以下为投资 MCP 返回的事实数据，只引用明确存在的内容：\n${JSON.stringify(mcpContext)}` : ''
+        const history = chat.messages.slice(0, -2).slice(-8).map(({ role, content }) => ({ role, content }))
+        const response = await fetch('http://127.0.0.1:8001/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ model: 'DeepSeek-R1-Distill-Qwen-1.5B', stream: true, max_tokens: 512, messages: [{ role: 'system', content: OUTPUT_RULES + contextText }, ...history, { role: 'user', content: prompt }] }) })
         if (!response.ok || !response.body) throw new Error('本地模型服务请求失败。')
-        const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ''
-        while (true) { const chunk = await reader.read(); if (chunk.done) break; buffer += decoder.decode(chunk.value, { stream: true }); const events = buffer.split('\n\n'); buffer = events.pop() || ''; for (const eventText of events) { const dataLine = eventText.split('\n').find((line) => line.startsWith('data: ')); if (!dataLine || dataLine === 'data: [DONE]') continue; const data = JSON.parse(dataLine.slice(6)); const delta = data.choices?.[0]?.delta || {}; const text = delta.content || delta.reasoning_content || ''; if (text) { answer.textContent += text; $('messages').scrollTop = $('messages').scrollHeight } if (data.error?.message) showError(data.error.message) } }
-        state.messages.push({ role: 'user', content: prompt }, { role: 'assistant', content: answer.textContent }); status('本机模型就绪', 'ready')
-      } catch (error) { answer.remove(); showError(error instanceof Error ? error.message : '本地模型请求失败。'); status('模型不可用', 'error') } finally { state.busy = false; $('send').disabled = false; $('input').focus() }
+        const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ''; let output = ''
+        while (true) {
+          const part = await reader.read(); if (part.done) break
+          buffer += decoder.decode(part.value, { stream: true }); const frames = buffer.split('\n\n'); buffer = frames.pop() || ''
+          for (const frame of frames) {
+            const line = frame.split('\n').find((item) => item.startsWith('data: ')); if (!line || line === 'data: [DONE]') continue
+            const data = JSON.parse(line.slice(6)); if (data.error?.message) throw new Error(data.error.message)
+            const delta = data.choices?.[0]?.delta || {}; output += delta.content || ''
+            answer.content = output || '正在生成回复…'; renderMessages(false)
+          }
+        }
+        answer.content = normalizeAnswer(output); delete answer.pending; renderModel({ running: true }); persist()
+      } catch (error) {
+        chat.messages = chat.messages.filter((message) => message !== answer)
+        setError(error instanceof Error ? error.message : '本地模型请求失败。'); renderModel({ running: false })
+      } finally { state.busy = false; renderGpu(state.gpu); renderHistory(); renderMessages(false); persist(); $('input').focus() }
     }
-    $('back').addEventListener('click', () => window.aiInvestmentDesktop?.openWebsite?.()); $('installModel').addEventListener('click', installModel); $('composer').addEventListener('submit', send); $('input').addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); $('composer').requestSubmit() } }); window.aiInvestmentDesktop?.onLocalModelStatus?.(renderModelState); checkHealth()
+    $('newChat').addEventListener('click', () => { if (!state.busy) createChat() })
+    $('installModel').addEventListener('click', installModel)
+    $('gpuToggle').addEventListener('change', toggleGpu)
+    $('composer').addEventListener('submit', send)
+    $('messages').addEventListener('scroll', () => { const panel = $('messages'); state.stickToBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight <= 32 })
+    $('input').addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); $('composer').requestSubmit() } })
+    $('back').addEventListener('click', () => { document.body.classList.add('leaving'); window.setTimeout(() => window.aiInvestmentDesktop?.openWebsite?.(), 180) })
+    window.aiInvestmentDesktop?.onLocalModelStatus?.((model) => renderModel(model))
+    state.chats = safeChats(); if (!state.chats.length) createChat(false); state.activeId = state.chats[0]?.id || null; renderHistory(); renderMessages(true)
+    document.body.classList.add('ready'); renderModel({}); void checkHealth()
   </script>
 </body>
 </html>

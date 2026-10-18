@@ -19,9 +19,32 @@ async function main() {
     await expect(localButton).toHaveCount(1)
     await localButton.click()
     await expect.poll(() => page.url()).toContain('local-ai.html')
-    await expect(page.locator('h1')).toHaveText('本地智投问答')
+    await expect(page.locator('.brand strong')).toHaveText('本地智投')
     await expect(page.locator('#composer')).toBeVisible()
     await expect(page.locator('#input')).toBeVisible()
+    await expect(page.locator('#historyList')).toBeVisible()
+    await expect(page.locator('#gpuToggle')).toBeVisible()
+    await page.locator('#newChat').click()
+    await expect(page.locator('.history-item')).toHaveCount(2)
+    const persistedHistoryCount = await page.evaluate(() => JSON.parse(localStorage.getItem('ai_invest_local_chats') || '[]').length)
+    if (persistedHistoryCount !== 2) throw new Error('Local chat history was not persisted')
+    const scrollCheck = await page.evaluate(() => {
+      const messages = document.querySelector('#messages')
+      const bubble = document.createElement('div')
+      bubble.className = 'message ai'
+      bubble.textContent = '长篇回答内容。'.repeat(1800)
+      messages.appendChild(bubble)
+      const result = {
+        viewportFits: document.documentElement.scrollHeight === window.innerHeight,
+        messagesScroll: messages.scrollHeight > messages.clientHeight,
+        bubbleWithinPanel: bubble.getBoundingClientRect().width <= messages.clientWidth,
+      }
+      bubble.remove()
+      return result
+    })
+    if (!scrollCheck.viewportFits || !scrollCheck.messagesScroll || !scrollCheck.bubbleWithinPanel) {
+      throw new Error(`Local chat scrolling/layout failed: ${JSON.stringify(scrollCheck)}`)
+    }
     const localHealth = await page.evaluate(async () => {
       try { return await (await fetch('http://127.0.0.1:8001/health')).json() }
       catch { return null }
@@ -35,7 +58,7 @@ async function main() {
     await page.locator('#back').click()
     await expect.poll(() => page.url(), { timeout: 60000 }).toBe('https://www.muyewhisper.cn/')
     await localButton.click()
-    await expect.poll(() => page.url(), { timeout: 60000 }).toContain('/local-ai')
+    await expect.poll(() => page.url(), { timeout: 60000 }).toContain('local-ai.html')
     console.log(JSON.stringify({ localAssistant: 'bundled-page', navigation: 'passed', composer: 'visible' }))
   } finally {
     await application.close()

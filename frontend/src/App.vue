@@ -153,9 +153,9 @@ const desktopView = ref<'market' | 'ai' | null>(isDesktopClient ? 'market' : nul
 const desktopWorkspaces = [
   { id: 'market', title: '市场总览' },
   { id: 'ai', title: 'AI 投顾' },
-  { id: 'local-ai', title: '本地智投' },
   { id: 'strategy', title: '策略工作台' },
   { id: 'account', title: '账号中心' },
+  { id: 'local-ai', title: '本地智投' },
 ] as const
 const activeDesktopWorkspace = computed(() => {
   if (isAccountRoute.value) return 'account'
