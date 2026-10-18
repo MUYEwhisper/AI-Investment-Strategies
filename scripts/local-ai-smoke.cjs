@@ -21,7 +21,16 @@ async function main() {
     await expect(page.locator('h1')).toHaveText('本地智投问答')
     await expect(page.locator('#composer')).toBeVisible()
     await expect(page.locator('#input')).toBeVisible()
-    await expect.poll(async () => page.evaluate(async () => (await fetch('http://127.0.0.1:8001/health')).json()), { timeout: 60000 }).toMatchObject({ status: 'ok' })
+    const localHealth = await page.evaluate(async () => {
+      try { return await (await fetch('http://127.0.0.1:8001/health')).json() }
+      catch { return null }
+    })
+    if (localHealth?.status === 'ok') {
+      await expect(page.locator('#status')).toHaveText('本机模型就绪')
+    } else {
+      await expect(page.locator('#installModel')).toBeVisible()
+      await expect(page.locator('#installModel')).toHaveText(/安装本地模型|启动本地模型/)
+    }
     await page.locator('#back').click()
     await expect.poll(() => page.url(), { timeout: 60000 }).toBe('https://www.muyewhisper.cn/')
     console.log(JSON.stringify({ localAssistant: 'bundled-page', navigation: 'passed', composer: 'visible' }))

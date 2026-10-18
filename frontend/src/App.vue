@@ -22,7 +22,7 @@ import { fetchUserChats, fetchUserWatchlist, saveUserChats, saveUserWatchlist, t
 import { useAuthStore } from './stores/auth'
 import { renderMarkdownToHtml } from './utils/markdown'
 import { cancelMotion, enterItem, enterPage, enterWorkspace, leaveItem, leaveWorkspace, MOTION, playMotion } from './utils/motion'
-import { isDesktopClient } from './utils/client'
+import { isDesktopClient, type LocalModelStatus } from './utils/client'
 
 type Stock = StockApiPayload & {
   id: string
@@ -86,6 +86,14 @@ const localMessages = ref<ChatMessage[]>([])
 const localInput = ref('')
 const localModelStatus = ref<'checking' | 'ready' | 'loading' | 'unavailable'>('checking')
 const localModelError = ref('')
+const localModelInstalled = ref(false)
+const localModelDownloading = ref(false)
+const localModelProgress = ref(0)
+const localModelSetupText = computed(() => localModelDownloading.value
+  ? '正在从 ModelScope 下载模型并配置本地服务。'
+  : localModelInstalled.value
+    ? '模型已安装，点击后自动启动本地推理服务。'
+    : '模型约 1.12GB，将从 ModelScope 下载至本机，不经过应用服务器。')
 const localModelStatusText = computed(() => ({
   checking: '检查本地模型', ready: '本机模型就绪', loading: '本机推理中', unavailable: '模型未就绪',
 })[localModelStatus.value])
@@ -1054,10 +1062,40 @@ async function checkLocalModel(): Promise<void> {
     const response = await fetch('http://127.0.0.1:8001/health', { signal: AbortSignal.timeout(2500) })
     const data = await response.json() as { modelReady?: boolean; message?: string }
     localModelStatus.value = data.modelReady ? 'ready' : 'unavailable'
+    localModelInstalled.value = Boolean(data.modelReady)
     localModelError.value = data.modelReady ? '' : data.message || '本地模型运行时或权重尚未安装。'
   } catch {
+    const desktopStatus = await window.aiInvestmentDesktop?.getLocalModelStatus?.()
+    if (desktopStatus) applyLocalModelStatus(desktopStatus)
+    else {
+      localModelStatus.value = 'unavailable'
+      localModelError.value = '本地模型服务未启动。请确认桌面客户端的本地模型运行时已安装。'
+    }
+  }
+}
+
+function applyLocalModelStatus(status: LocalModelStatus): void {
+  localModelInstalled.value = status.installed
+  localModelDownloading.value = Boolean(status.downloading)
+  localModelProgress.value = status.progress || 0
+  localModelStatus.value = status.running ? 'ready' : status.downloading ? 'loading' : 'unavailable'
+  localModelError.value = status.running || status.downloading ? '' : status.message || ''
+}
+
+async function installLocalModel(): Promise<void> {
+  if (localModelDownloading.value) return
+  localModelError.value = ''
+  localModelDownloading.value = true
+  localModelStatus.value = 'loading'
+  try {
+    const result = await window.aiInvestmentDesktop?.installLocalModel?.()
+    if (result?.error) localModelError.value = result.error
+    if (result) applyLocalModelStatus(result)
+    else await checkLocalModel()
+  } catch (error) {
+    localModelDownloading.value = false
     localModelStatus.value = 'unavailable'
-    localModelError.value = '本地模型服务未启动。请确认桌面客户端的本地模型运行时已安装。'
+    localModelError.value = error instanceof Error ? error.message : '本地模型安装失败。'
   }
 }
 
@@ -1308,7 +1346,10 @@ watch(
 
 onMounted(() => {
   window.addEventListener('desktop-view-change', onDesktopViewChange)
-  if (isDesktopClient) void checkLocalModel()
+  if (isDesktopClient) {
+    void checkLocalModel()
+    window.aiInvestmentDesktop?.onLocalModelStatus?.(applyLocalModelStatus)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -1456,6 +1497,16 @@ onBeforeUnmount(() => {
                   <div class="panel-subtitle">DeepSeek-R1-Distill-Qwen-1.5B · 本机推理</div>
                 </div>
                 <span class="local-model-status" :class="localModelStatus">{{ localModelStatusText }}</span>
+              </div>
+              <div v-if="localModelStatus === 'unavailable' || localModelDownloading" class="local-model-setup">
+                <div class="local-model-setup-copy">
+                  <strong>{{ localModelDownloading ? '正在安装本地模型' : localModelInstalled ? '本地推理服务未运行' : '本地模型尚未安装' }}</strong>
+                  <span>{{ localModelSetupText }}</span>
+                  <progress v-if="localModelDownloading" max="100" :value="localModelProgress"></progress>
+                </div>
+                <button class="btn primary" type="button" :disabled="localModelDownloading" @click="installLocalModel">
+                  {{ localModelDownloading ? '正在安装...' : localModelInstalled ? '启动本地模型' : '安装本地模型' }}
+                </button>
               </div>
               <div class="local-ai-messages" aria-live="polite">
                 <div v-for="(message, index) in localMessages" :key="index" class="local-ai-message" :class="message.role">

@@ -13,13 +13,13 @@
 
 ## 直接使用 Windows 应用
 
-运行 [GitHub Releases](https://github.com/MUYEwhisper/AI-Investment-Strategies/releases/latest) 中最新的 `AI-Investment-Strategies-Setup-1.1.1-x64.exe`，按安装程序提示安装。应用需要网络连接获取登录、行情和 MCP 数据；本地智投的量化模型和运行时随安装包提供，安装后可直接进行本机推理，不会首次联网下载模型。
+运行 [GitHub Releases](https://github.com/MUYEwhisper/AI-Investment-Strategies/releases/latest) 中最新的 Windows 安装包，按安装程序提示安装。应用需要网络连接获取登录、行情和 MCP 数据；本地模型由用户在“本地智投”页面点击安装后直接从 ModelScope 下载至本机，模型文件不包含在安装包内，也不经过应用服务器。
 
 当前桌面客户端加载 `https://www.muyewhisper.cn/`。如果服务器暂时不可达，应用会显示重连页面，点击“重新连接”或按 `Ctrl + R` 即可恢复。
 
-桌面端工作区新增“本地智投”。该页只保留“智投问答”，使用随应用封装的 `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` 在本机推理；股票、市场和新闻数据通过与云端模型相同的今日投资 MCP 服务取得。安装包内置约 1.12 GB 的 Q4_K_M 量化模型，安装完成即可使用。开发环境可运行 `npm run local-model:download` 下载原始模型到 `backend/cache/models/`。
+桌面端工作区新增“本地智投”。该页只保留“智投问答”，使用 `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` 在本机推理；股票、市场和新闻数据通过与云端模型相同的今日投资 MCP 服务取得。首次进入时若模型未安装或服务不可用，页面会提供自动安装/启动按钮，并显示 ModelScope 下载进度。模型安装到当前 Windows 用户的数据目录，卸载应用时保留模型文件。
 
-本地模型服务使用随应用分发的 llama.cpp 运行时和 GGUF 量化权重。正式安装包包含本地模型和运行时；缺少资源时会在本地智投页明确提示，不会静默触发下载。
+本地模型服务使用随应用分发的轻量 llama.cpp 运行时和 ModelScope GGUF 量化权重。正式安装包只包含应用本体和推理运行时，不包含模型权重；下载完成后自动启动服务，并等待健康检查通过。本地问答仍会调用线上 `/chat/local-context` 获取 MCP 数据。
 
 桌面客户端由 Vue 首帧直接渲染独立的桌面应用壳：使用左侧工作区导航栏，将市场总览、AI 投顾、策略工作台和账号中心分开显示，并配合紧凑卡片与 Windows 风格控件。旧网页导航和旧桌面注入层已移除，下载入口只在网站端显示，桌面端会自动隐藏；所有股票、板块、AI 对话、登录和策略工作台功能仍使用同一套线上页面与服务器接口。
 

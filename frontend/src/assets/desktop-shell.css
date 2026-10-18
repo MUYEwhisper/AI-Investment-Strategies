@@ -564,6 +564,19 @@
     padding: 12px;
   }
 
+  .desktop-shell .local-model-setup {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--desktop-line);
+    background: #f7fafc;
+  }
+  .desktop-shell .local-model-setup-copy { flex: 1; min-width: 0; color: var(--desktop-muted); font-size: 12px; line-height: 1.5; }
+  .desktop-shell .local-model-setup-copy strong { display: block; color: var(--desktop-ink); font-size: 13px; }
+  .desktop-shell .local-model-setup-copy progress { display: block; width: 100%; height: 5px; margin-top: 7px; accent-color: #256b91; }
+  @media (max-width: 720px) { .desktop-shell .local-model-setup { align-items: stretch; flex-direction: column; } .desktop-shell .local-model-setup .btn { width: 100%; } }
+
   .desktop-shell .desktop-sidebar {
     top: 12px;
     min-height: calc(100vh - 24px);

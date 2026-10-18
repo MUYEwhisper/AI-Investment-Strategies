@@ -43,3 +43,12 @@ test('the local assistant is bundled as an app page instead of a remote route', 
   assert.match(main, /loadFile\(localAiFile\)/)
   assert.doesNotMatch(main, /window\.location\.assign\('\/local-ai'\)/)
 })
+
+test('the local model is downloaded on demand and verified before it is started', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.cjs'), 'utf8')
+  const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8'))
+  assert.match(main, /modelscope\.cn\/models\/unsloth\/DeepSeek-R1-Distill-Qwen-1\.5B-GGUF/)
+  assert.match(main, /MODEL_SHA256/)
+  assert.match(main, /waitForLocalModelServer/)
+  assert.doesNotMatch(JSON.stringify(packageJson.build.extraResources), /DeepSeek-R1-Distill-Qwen-1\.5B-Q4_K_M\.gguf/)
+})

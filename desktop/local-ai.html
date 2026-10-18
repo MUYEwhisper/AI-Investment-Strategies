@@ -16,10 +16,16 @@
     button.primary { color: #fff; background: #256b91; border-color: #256b91; } button:disabled { opacity: .55; cursor: default; }
     main { width: min(1040px, calc(100% - 48px)); flex: 1; margin: 24px auto; display: flex; }
     .panel { display: flex; flex: 1; min-height: calc(100vh - 144px); flex-direction: column; background: #fff; border: 1px solid #dbe5ed; border-radius: 8px; overflow: hidden; }
-    .panel-head { padding: 22px 24px 16px; display: flex; justify-content: space-between; align-items: start; border-bottom: 1px solid #e6edf2; }
+    .panel-head { padding: 22px 24px 16px; display: flex; justify-content: space-between; align-items: start; border-bottom: 1px solid #e6edf2; gap: 16px; }
     h1 { margin: 0; font-size: 22px; } .model { color: #718193; font-size: 13px; margin-top: 6px; }
     .status { font-size: 13px; padding: 5px 9px; border: 1px solid #c9d7e5; border-radius: 4px; color: #718193; } .status.ready { color: #27754d; background: #f2fbf5; border-color: #9bd5b6; } .status.error { color: #a33e3e; background: #fff7f7; border-color: #e2b4b4; }
     .messages { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 22px 24px; overflow: auto; }
+    .setup { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: #f7fafc; border-bottom: 1px solid #e6edf2; }
+    .setup-copy { min-width: 0; flex: 1; color: #526779; font-size: 13px; line-height: 1.5; }
+    .setup-copy strong { display: block; color: #25465d; font-size: 14px; }
+    .setup-action { flex: 0 0 auto; }
+    progress { width: 100%; height: 6px; display: block; margin-top: 8px; accent-color: #256b91; }
+    @media (max-width: 620px) { header { padding: 0 16px; } main { width: calc(100% - 24px); margin: 12px auto; } .panel { min-height: calc(100vh - 96px); } .panel-head { padding: 16px; } .setup { align-items: stretch; padding: 14px 16px; flex-direction: column; gap: 10px; } .setup-action { width: 100%; } .messages { padding: 16px; } form { padding: 12px 16px; } }
     .message, .empty { max-width: min(800px, 88%); padding: 12px 15px; border: 1px solid #dbe5ed; border-radius: 6px; white-space: pre-wrap; line-height: 1.65; } .message.user { align-self: flex-end; background: #edf4f9; border-color: #bfd4e6; } .message.ai, .empty { align-self: flex-start; } .empty { color: #718193; }
     form { display: flex; align-items: end; gap: 12px; padding: 16px 24px; border-top: 1px solid #e6edf2; } textarea { flex: 1; min-height: 58px; max-height: 180px; resize: vertical; padding: 11px; border: 1px solid #c4d2df; border-radius: 6px; font: inherit; line-height: 1.5; } .error { padding: 0 24px 15px; color: #a33e3e; font-size: 13px; }
   </style>
@@ -27,7 +33,7 @@
 <body>
   <div class="shell">
     <header><div><div class="brand">智能投资平台</div><div class="sub">本地智投 · 仅保留智投问答</div></div><button id="back">返回云端工作台</button></header>
-    <main><section class="panel"><div class="panel-head"><div><h1>本地智投问答</h1><div class="model">DeepSeek-R1-Distill-Qwen-1.5B · 本机推理 · 与云端使用同一 MCP 数据源</div></div><span id="status" class="status">检查本地模型</span></div><div id="messages" class="messages"><div class="empty">你好，我是本地智投问答。提出投资问题后，我会在本机运行模型，并按需查询投资 MCP 数据。</div></div><form id="composer"><textarea id="input" placeholder="输入投资相关问题" aria-label="投资问题"></textarea><button id="send" class="primary" type="submit">发送</button></form><div id="error" class="error" hidden></div></section></main>
+    <main><section class="panel"><div class="panel-head"><div><h1>本地智投问答</h1><div class="model">DeepSeek-R1-Distill-Qwen-1.5B · 本机推理 · 与云端使用同一 MCP 数据源</div></div><span id="status" class="status">检查本地模型</span></div><div id="setup" class="setup" hidden><div class="setup-copy"><strong id="setupTitle">本地模型尚未安装</strong><span id="setupMessage">点击后将从 ModelScope 下载模型至本机，并自动启动本地推理服务。</span><progress id="installProgress" max="100" value="0" hidden></progress></div><button id="installModel" class="primary setup-action" type="button">安装本地模型</button></div><div id="messages" class="messages"><div class="empty">你好，我是本地智投问答。提出投资问题后，我会在本机运行模型，并按需查询投资 MCP 数据。</div></div><form id="composer"><textarea id="input" placeholder="输入投资相关问题" aria-label="投资问题"></textarea><button id="send" class="primary" type="submit">发送</button></form><div id="error" class="error" hidden></div></section></main>
   </div>
   <script>
     const SITE = 'https://www.muyewhisper.cn'
@@ -36,7 +42,38 @@
     const status = (text, kind = '') => { $('status').textContent = text; $('status').className = 'status ' + kind }
     const showError = (text) => { $('error').textContent = text; $('error').hidden = !text }
     const addMessage = (role, content) => { const node = document.createElement('div'); node.className = 'message ' + role; node.textContent = content; $('messages').appendChild(node); $('messages').scrollTop = $('messages').scrollHeight; return node }
-    async function checkHealth() { try { const response = await fetch('http://127.0.0.1:8001/health'); const data = await response.json(); if (response.ok && data.status === 'ok') status('本机模型就绪', 'ready'); else status('模型资源未就绪', 'error'); showError(response.ok ? '' : '本地模型资源未就绪。请重新安装最新版本。') } catch { status('本地服务未启动', 'error'); showError('本地模型服务未启动。请重新启动桌面客户端。') } }
+    let modelState = { installed: false, running: false, downloading: false, progress: 0 }
+    function renderModelState(next) {
+      modelState = next
+      const unavailable = !next.installed || !next.running
+      $('setup').hidden = !unavailable
+      $('setupTitle').textContent = next.downloading ? '正在安装本地模型' : next.installed ? '本地推理服务未运行' : '本地模型尚未安装'
+      $('setupMessage').textContent = next.downloading ? next.message : next.installed ? '点击后将自动启动本地模型服务。' : '模型约 1.12GB，将从 ModelScope 下载至本机，不经过应用服务器。'
+      $('installModel').textContent = next.downloading ? '正在安装…' : next.installed ? '启动本地模型' : '安装本地模型'
+      $('installModel').disabled = Boolean(next.downloading)
+      $('installProgress').hidden = !next.downloading
+      $('installProgress').value = next.progress || 0
+      if (next.running) { status('本机模型就绪', 'ready'); showError('') }
+      else if (next.downloading) status('正在安装模型')
+      else status(next.installed ? '本地服务未启动' : '模型未安装', 'error')
+    }
+    async function checkHealth() {
+      try {
+        const response = await fetch('http://127.0.0.1:8001/health')
+        const data = await response.json()
+        if (response.ok && data.status === 'ok') { renderModelState({ ...modelState, installed: true, running: true }); return }
+      } catch { /* The service may not be installed or started yet. */ }
+      try { renderModelState(await window.aiInvestmentDesktop?.getLocalModelStatus?.() || modelState) }
+      catch { renderModelState(modelState); showError('无法读取本地模型状态。请重新启动桌面客户端后重试。') }
+    }
+    async function installModel() {
+      showError('')
+      try {
+        const result = await window.aiInvestmentDesktop?.installLocalModel?.()
+        if (result?.error) showError(result.error)
+        await checkHealth()
+      } catch (error) { showError(error instanceof Error ? error.message : '本地模型安装失败。') }
+    }
     async function send(event) {
       event.preventDefault(); const prompt = $('input').value.trim(); if (!prompt || state.busy) return
       state.busy = true; $('input').value = ''; $('send').disabled = true; showError(''); addMessage('user', prompt); const answer = addMessage('ai', ''); status('本机推理中')
@@ -51,7 +88,7 @@
         state.messages.push({ role: 'user', content: prompt }, { role: 'assistant', content: answer.textContent }); status('本机模型就绪', 'ready')
       } catch (error) { answer.remove(); showError(error instanceof Error ? error.message : '本地模型请求失败。'); status('模型不可用', 'error') } finally { state.busy = false; $('send').disabled = false; $('input').focus() }
     }
-    $('back').addEventListener('click', () => window.aiInvestmentDesktop?.openWebsite?.()); $('composer').addEventListener('submit', send); $('input').addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); $('composer').requestSubmit() } }); checkHealth()
+    $('back').addEventListener('click', () => window.aiInvestmentDesktop?.openWebsite?.()); $('installModel').addEventListener('click', installModel); $('composer').addEventListener('submit', send); $('input').addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); $('composer').requestSubmit() } }); window.aiInvestmentDesktop?.onLocalModelStatus?.(renderModelState); checkHealth()
   </script>
 </body>
 </html>

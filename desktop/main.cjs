@@ -1,7 +1,9 @@
-const { app, BrowserWindow, Menu, dialog, shell, screen, session } = require('electron')
+const { app, BrowserWindow, Menu, dialog, shell, screen, session, ipcMain } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
+const crypto = require('node:crypto')
 const { spawn } = require('node:child_process')
+const https = require('node:https')
 const { SITE_URL, REPOSITORY_URL, RELEASES_URL, isAppNavigation, isWebsiteNavigation, isExternalLink } = require('./navigation.cjs')
 const { readWindowState, saveWindowState } = require('./window-state.cjs')
 
@@ -14,6 +16,8 @@ if (process.env.AI_INVEST_TEST_PROFILE) {
 
 let mainWindow
 let localModelProcess
+let localModelServerReady = false
+let localModelInstall = null
 const offlineFile = path.join(__dirname, 'offline.html')
 const localAiFile = path.join(__dirname, 'local-ai.html')
 const desktopShellCssFile = path.join(__dirname, '..', 'frontend', 'src', 'assets', 'desktop-shell.css')
@@ -178,15 +182,44 @@ function openExternal(url) {
   if (isExternalLink(url)) void shell.openExternal(url).catch(() => {})
 }
 
+const MODEL_FILE = 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf'
+const MODEL_URL = 'https://www.modelscope.cn/models/unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/master/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf'
+const MODEL_SHA256 = 'f3bdf9cf31dee4b57ae4e455a1cb0d01b5c2c1b50d72d3112141c195506c2840'
+
+function modelDirectory() {
+  return path.join(app.getPath('userData'), 'models')
+}
+
+function modelPath() {
+  return path.join(modelDirectory(), MODEL_FILE)
+}
+
+function localModelStatus() {
+  const installed = fs.existsSync(modelPath()) && fs.statSync(modelPath()).size > 1_000_000_000
+  return {
+    model: 'DeepSeek-R1-Distill-Qwen-1.5B',
+    installed,
+    running: localModelServerReady,
+    downloading: Boolean(localModelInstall),
+    progress: localModelInstall?.progress || 0,
+    message: localModelInstall?.message || (installed ? '本地模型已安装' : '本地模型尚未安装'),
+  }
+}
+
+function broadcastModelStatus() {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('local-model-status', localModelStatus())
+}
+
 function startLocalModelServer() {
   if (process.env.AI_INVEST_DISABLE_LOCAL_MODEL === '1') return
   const resourcesDir = process.resourcesPath || path.join(__dirname, '..')
   const llamaDir = app.isPackaged
     ? path.join(resourcesDir, 'local-runtime')
     : path.join(__dirname, '..', 'desktop', 'llama-runtime')
-  const bundledModel = path.join(resourcesDir, 'models', 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf')
+  const bundledModel = modelPath()
   const llamaServer = path.join(llamaDir, process.platform === 'win32' ? 'llama-server.exe' : 'llama-server')
   if (!fs.existsSync(llamaServer) || !fs.existsSync(bundledModel)) return
+  if (localModelProcess && !localModelProcess.killed) return
   localModelProcess = spawn(llamaServer, [
     '--model', bundledModel, '--host', '127.0.0.1', '--port', '8001',
     '--ctx-size', '4096', '--threads', String(Math.max(2, Math.min(8, Number.parseInt(process.env.LOCAL_MODEL_THREADS || '4', 10)))),
@@ -200,9 +233,97 @@ function startLocalModelServer() {
     windowsHide: true,
   })
   localModelProcess.on('error', (error) => {
+    localModelServerReady = false
     if (!app.isPackaged) console.error('Local model server failed to start:', error)
   })
-  localModelProcess.on('exit', () => { localModelProcess = undefined })
+  localModelProcess.on('exit', () => { localModelProcess = undefined; localModelServerReady = false; broadcastModelStatus() })
+  broadcastModelStatus()
+}
+
+function waitForLocalModelServer(timeoutMs = 180000) {
+  const startedAt = Date.now()
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      if (!localModelProcess || localModelProcess.killed) return reject(new Error('本地模型服务启动失败，请重试。'))
+      const request = require('node:http').get('http://127.0.0.1:8001/health', (response) => {
+        response.resume()
+        if (response.statusCode === 200) {
+          localModelServerReady = true
+          broadcastModelStatus()
+          return resolve()
+        }
+        retry()
+      })
+      request.setTimeout(1500, () => request.destroy())
+      request.on('error', retry)
+      function retry() {
+        if (Date.now() - startedAt >= timeoutMs) return reject(new Error('本地模型启动超时，请检查磁盘空间后重试。'))
+        setTimeout(check, 1200)
+      }
+    }
+    check()
+  })
+}
+
+function downloadLocalModel() {
+  if (localModelInstall) return localModelInstall.promise
+  fs.mkdirSync(modelDirectory(), { recursive: true })
+  const temporaryPath = `${modelPath()}.download`
+  const promise = new Promise((resolve, reject) => requestModel(MODEL_URL, temporaryPath, 0, resolve, reject))
+  localModelInstall = { progress: 0, message: '正在连接 ModelScope…', promise }
+  broadcastModelStatus()
+  promise.then(() => {
+    fs.renameSync(temporaryPath, modelPath())
+    localModelInstall = null
+    startLocalModelServer()
+    broadcastModelStatus()
+  }).catch((error) => {
+    try { fs.rmSync(temporaryPath, { force: true }) } catch {}
+    localModelInstall = null
+    if (!app.isPackaged) console.error('Local model download failed:', error)
+    broadcastModelStatus()
+  })
+  return promise
+}
+
+function streamModel(response, resolve, reject, temporaryPath) {
+  const total = Number(response.headers['content-length'] || 0)
+  let received = 0
+  const digest = crypto.createHash('sha256')
+  const output = fs.createWriteStream(temporaryPath)
+  response.on('data', (chunk) => {
+    received += chunk.length
+    digest.update(chunk)
+    if (localModelInstall) {
+      localModelInstall.progress = total ? Math.min(99, Math.floor(received / total * 100)) : 0
+      localModelInstall.message = total ? `正在下载本地模型 ${Math.round(received / 1024 / 1024)} / ${Math.round(total / 1024 / 1024)} MB` : '正在下载本地模型…'
+      broadcastModelStatus()
+    }
+  })
+  response.on('error', reject)
+  output.on('error', reject)
+  output.on('finish', () => {
+    const actual = digest.digest('hex')
+    if (actual !== MODEL_SHA256) return reject(new Error('下载校验未通过，请检查网络后重试。'))
+    resolve()
+  })
+  response.pipe(output)
+}
+
+function requestModel(url, temporaryPath, redirects, resolve, reject) {
+  if (redirects > 5) return reject(new Error('ModelScope 下载地址重定向次数过多。'))
+  const request = https.get(url, { headers: { 'User-Agent': 'AI-Investment-Strategies/1.1.2' } }, (response) => {
+    if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+      response.resume()
+      return requestModel(new URL(response.headers.location, url).toString(), temporaryPath, redirects + 1, resolve, reject)
+    }
+    if (response.statusCode !== 200) {
+      response.resume()
+      return reject(new Error(`ModelScope 下载失败（HTTP ${response.statusCode}）`))
+    }
+    streamModel(response, resolve, reject, temporaryPath)
+  })
+  request.on('error', reject)
 }
 
 function stopLocalModelServer() {
@@ -210,6 +331,26 @@ function stopLocalModelServer() {
   localModelProcess.kill()
   localModelProcess = undefined
 }
+
+ipcMain.handle('install-local-model', async () => {
+  if (localModelServerReady) return localModelStatus()
+  if (localModelStatus().installed) {
+    startLocalModelServer()
+    try {
+      await waitForLocalModelServer()
+      return localModelStatus()
+    } catch (error) {
+      return { ...localModelStatus(), error: error instanceof Error ? error.message : '本地模型启动失败' }
+    }
+  }
+  try {
+    await downloadLocalModel()
+    await waitForLocalModelServer()
+    return localModelStatus()
+  } catch (error) {
+    return { ...localModelStatus(), error: error instanceof Error ? error.message : '本地模型安装失败' }
+  }
+})
 
 function launchUninstaller() {
   if (!app.isPackaged) {
@@ -354,6 +495,7 @@ if (!app.requestSingleInstanceLock()) {
         title: '保存文件', defaultPath: path.join(app.getPath('downloads'), path.basename(item.getFilename())),
       })
     })
+    ipcMain.handle('local-model-status', () => localModelStatus())
     createWindow()
     startLocalModelServer()
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
