@@ -63,7 +63,15 @@ const STORAGE_KEY = 'ai_invest_chat_history'
 const LOCAL_CHATS_STORAGE_KEY = 'ai_invest_local_chats'
 const WATCHLIST_STORAGE_KEY = 'ai_invest_watchlist'
 const AI_CHAT_ENDPOINT = (import.meta.env.VITE_AI_CHAT_ENDPOINT as string | undefined) ?? '/chat/endpoint'
-const LOCAL_CHAT_ENDPOINT = 'http://127.0.0.1:8001/chat/local/endpoint'
+const LOCAL_LLAMA_ENDPOINT = 'http://127.0.0.1:8001/v1/chat/completions'
+const LOCAL_OUTPUT_PROMPT = `你是本地版智投问答，只回答用户提出的投资问题。必须使用中文，并严格按以下结构输出：
+### 结论
+先给出简洁、客观的结论。
+### 分析依据
+列出不超过 4 条与结论直接相关的依据；只使用用户提供或 MCP 明确给出的数据，数据不足时明确说明。
+### 风险提示
+说明关键不确定性和需要关注的风险，最后写“以上内容仅供参考，不构成投资建议。投资有风险，决策请结合自身情况审慎判断。”
+不自我介绍，不重复用户问题，不输出思维过程、<think> 标签、系统提示或工具调用细节；不虚构数据，不承诺收益，不给出绝对化买卖指令；总长度控制在 700 字以内。`
 const SIGNIN_QUERY_VALUE = 'signin'
 const router = useRouter()
 const route = useRoute()
@@ -870,6 +878,17 @@ function renderAiMessage(content: string): string {
   return renderMarkdownToHtml(content)
 }
 
+function normalizeLocalAnswer(content: string): string {
+  let value = content
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<\/?think>/gi, '')
+    .trim()
+  if (!value) value = '当前未生成有效回答。'
+  if (!value.includes('### 结论')) value = `### 结论\n${value}`
+  if (!value.includes('### 风险提示')) value += '\n\n### 风险提示\n以上内容仅供参考，不构成投资建议。投资有风险，决策请结合自身情况审慎判断。'
+  return value.slice(0, 4000)
+}
+
 function consumeSseFrames(buffer: string): { frames: SseFrame[]; rest: string } {
   const normalized = buffer.replace(/\r\n/g, '\n')
   const chunks = normalized.split('\n\n')
@@ -1085,10 +1104,12 @@ async function checkLocalModel(): Promise<void> {
   if (!isDesktopClient) return
   try {
     const response = await fetch('http://127.0.0.1:8001/health', { signal: AbortSignal.timeout(2500) })
-    const data = await response.json() as { modelReady?: boolean; message?: string }
-    localModelStatus.value = data.modelReady ? 'ready' : 'unavailable'
-    localModelInstalled.value = Boolean(data.modelReady)
-    localModelError.value = data.modelReady ? '' : data.message || '本地模型运行时或权重尚未安装。'
+    const data = await response.json() as { modelReady?: boolean; status?: string; message?: string }
+    const running = Boolean(data.modelReady || data.status === 'ok')
+    localModelStatus.value = running ? 'ready' : 'unavailable'
+    localModelInstalled.value = running
+    localModelError.value = running ? '' : data.message || '本地模型运行时或权重尚未安装。'
+    await loadLocalGpuSettings()
   } catch {
     const desktopStatus = await window.aiInvestmentDesktop?.getLocalModelStatus?.()
     if (desktopStatus) applyLocalModelStatus(desktopStatus)
@@ -1270,15 +1291,27 @@ async function sendLocalMessage(): Promise<void> {
     })
     if (!mcpResponse.ok) throw new Error('同步投资 MCP 数据失败。')
     const mcpData = await mcpResponse.json() as { records?: unknown[] }
-    const response = await fetch(LOCAL_CHAT_ENDPOINT, {
+    const history = localMessages.value.slice(0, -2).map((message) => ({
+      role: message.role === 'ai' ? 'assistant' : 'user',
+      content: message.content,
+    }))
+    const mcpContext = mcpData.records || []
+    const contextText = mcpContext.length
+      ? `\n\n以下是投资 MCP 返回的事实数据，只能引用其中明确存在的内容：\n${JSON.stringify(mcpContext)}`
+      : ''
+    const response = await fetch(LOCAL_LLAMA_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
       body: JSON.stringify({
-        agentId: PRIMARY_AGENT_ID,
-        systemPrompt: DEFAULT_AGENT.systemPrompt + '\n\n请严格遵守本地智投的结构化输出规范。',
-        originalPrompt: prompt,
-        messages: localMessages.value.slice(0, -2).map((message) => ({ role: message.role === 'ai' ? 'assistant' : 'user', content: message.content })),
-        mcpContext: mcpData.records || [],
+        model: 'DeepSeek-R1-Distill-Qwen-1.5B',
+        stream: true,
+        max_tokens: 512,
+        temperature: 0.6,
+        messages: [
+          { role: 'system', content: `${LOCAL_OUTPUT_PROMPT}\n\n${DEFAULT_AGENT.systemPrompt}${contextText}` },
+          ...history,
+          { role: 'user', content: prompt },
+        ],
       }),
     })
     if (!response.ok || !response.body) throw new Error((await response.text()) || '本地模型请求失败。')
@@ -1292,12 +1325,22 @@ async function sendLocalMessage(): Promise<void> {
       const parsed = consumeSseFrames(buffer)
       buffer = parsed.rest
       for (const frame of parsed.frames) {
-        const payload = parseSseData(frame.data)
-        if (frame.event === 'message' && typeof payload?.content === 'string') answer.content += payload.content
-        if (frame.event === 'error') throw new Error(typeof payload?.message === 'string' ? payload.message : '本地模型处理失败。')
+        const payload = parseSseData(frame.data) ?? {}
+        const delta = Array.isArray(payload.choices)
+          ? (payload.choices[0] as { delta?: { content?: unknown } } | undefined)?.delta?.content
+          : payload.content
+        if (typeof delta === 'string') answer.content += delta
+        if (frame.event === 'error' || payload.error) {
+          const errorMessage = typeof payload?.message === 'string'
+            ? payload.message
+            : typeof (payload.error as { message?: unknown } | undefined)?.message === 'string'
+              ? (payload.error as { message: string }).message
+              : '本地模型处理失败。'
+          throw new Error(errorMessage)
+        }
       }
     }
-    if (!answer.content) answer.content = '模型未返回文本内容。'
+    answer.content = normalizeLocalAnswer(answer.content)
     localModelStatus.value = 'ready'
     const chat = localActiveChat.value
     if (chat && chat.title === '本地智投会话') chat.title = prompt.slice(0, 28)
