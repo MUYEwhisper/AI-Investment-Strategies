@@ -18,26 +18,25 @@ async function main() {
     await expect(localButton).toBeVisible({ timeout: 60000 })
     await expect(localButton).toHaveCount(1)
     await localButton.click()
-    await expect.poll(() => page.url()).toContain('/local-ai')
-    await expect(page.locator('.chat-panel')).toBeVisible()
-    await expect(page.locator('.chat-sidebar')).toBeVisible()
-    await expect(page.locator('#localHistoryList')).toBeVisible()
-    await expect(page.locator('#localMessages')).toBeVisible()
+    await expect.poll(() => page.url()).toContain('local-ai.html')
+    await expect(page.locator('h1')).toHaveText('本地智投问答')
+    await expect(page.locator('#composer')).toBeVisible()
+    await expect(page.locator('#input')).toBeVisible()
     const localHealth = await page.evaluate(async () => {
       try { return await (await fetch('http://127.0.0.1:8001/health')).json() }
       catch { return null }
     })
     if (localHealth?.status === 'ok') {
-      await expect(page.locator('.local-model-status')).toHaveText('本机模型就绪')
+      await expect(page.locator('#status')).toHaveText('本机模型就绪')
     } else {
-      await expect(page.locator('.local-model-setup .btn')).toBeVisible()
-      await expect(page.locator('.local-model-setup .btn')).toHaveText(/安装本地模型|启动本地模型/)
+      await expect(page.locator('#installModel')).toBeVisible()
+      await expect(page.locator('#installModel')).toHaveText(/安装本地模型|启动本地模型/)
     }
-    await page.locator('.desktop-sidebar-item').filter({ hasText: '市场总览' }).click()
+    await page.locator('#back').click()
     await expect.poll(() => page.url(), { timeout: 60000 }).toBe('https://www.muyewhisper.cn/')
     await localButton.click()
     await expect.poll(() => page.url(), { timeout: 60000 }).toContain('/local-ai')
-    console.log(JSON.stringify({ localAssistant: 'vue-route', navigation: 'passed', history: 'visible' }))
+    console.log(JSON.stringify({ localAssistant: 'bundled-page', navigation: 'passed', composer: 'visible' }))
   } finally {
     await application.close()
     await fs.rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })

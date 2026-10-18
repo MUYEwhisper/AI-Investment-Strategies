@@ -20,6 +20,7 @@ let localModelServerReady = false
 let localModelInstall = null
 let localModelGpuActive = false
 const offlineFile = path.join(__dirname, 'offline.html')
+const localAiFile = path.join(__dirname, 'local-ai.html')
 const desktopShellCssFile = path.join(__dirname, '..', 'frontend', 'src', 'assets', 'desktop-shell.css')
 
 let desktopShellCss
@@ -157,11 +158,7 @@ async function applyDesktopShell(contents) {
             if (!target || !sidebar.contains(target)) return
             event.preventDefault()
             event.stopImmediatePropagation()
-            if (location.pathname !== '/local-ai') {
-              history.pushState({}, '', '/local-ai')
-            }
-            window.dispatchEvent(new PopStateEvent('popstate'))
-            scheduleNavigationSync()
+            window.aiInvestmentDesktop?.openLocalAi?.()
           }, true)
         }
 
@@ -531,7 +528,7 @@ function createWindow() {
   const contents = mainWindow.webContents
   contents.on('ipc-message', (_event, channel) => {
     if (channel === 'open-local-ai') {
-      void contents.executeJavaScript("history.pushState({}, '', '/local-ai'); window.dispatchEvent(new PopStateEvent('popstate'))")
+      void contents.loadFile(localAiFile).catch(() => {})
     }
     if (channel === 'open-website') void goHome()
   })

@@ -37,12 +37,10 @@ test('untrusted origins and privileged URL schemes cannot enter the app', () => 
   assert.equal(isExternalLink('javascript:alert(1)'), false)
 })
 
-test('the local assistant uses the Vue desktop route', () => {
+test('the local assistant opens its bundled desktop page', () => {
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.cjs'), 'utf8')
-  assert.match(main, /history\.pushState\(\{\}, '', '\/local-ai'\)/)
-  assert.match(main, /data-route="local-ai"/)
-  assert.match(main, /localAiClickHandler/)
-  assert.doesNotMatch(main, /loadFile\(localAiFile\)/)
+  assert.match(main, /loadFile\(localAiFile\)/)
+  assert.equal(fs.existsSync(path.join(__dirname, '..', 'local-ai.html')), true)
 })
 
 test('the local model is downloaded on demand and verified before it is started', () => {
