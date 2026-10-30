@@ -17,13 +17,16 @@
     "frontend:dev": "npm run dev --prefix frontend",
     "frontend:build": "npm run build --prefix frontend",
     "frontend:test": "npm run test:unit --prefix frontend -- --run",
+    "backend:test:local-context": "python -m unittest discover -s backend/tests -p test_local_context.py -v",
     "local-model:download": "python backend/utils/models/download.py",
-    "verify:baseline": "node scripts/verify-baseline.cjs"
+    "verify:baseline": "node scripts/verify-baseline.cjs",
+    "verify:baseline:test": "node --test scripts/tests/verify-baseline.test.cjs"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
     "electron": "44.5.1",
-    "electron-builder": "26.15.3"
+    "electron-builder": "26.15.3",
+    "jsdom": "28.1.0"
   },
   "engines": {
     "node": ">=22.12.0"

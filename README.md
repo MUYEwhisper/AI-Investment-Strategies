@@ -1,13 +1,14 @@
 # 智能投资平台（Windows 11 桌面版）
 
-这是 MUYEwhisper 的智能投资决策项目整合仓库。桌面客户端适用于 64 位 Windows 11，界面和业务功能与线上站点保持一致，业务请求直接连接生产服务器 `https://www.muyewhisper.cn/`。仓库同时保留 Vue 3 前端源码、Flask 后端同步快照、线上构建快照和可审计的服务器基线清单。
+这是 MUYEwhisper 的智能投资决策项目整合仓库。桌面客户端适用于 64 位 Windows 11，主窗口加载生产站点 `https://www.muyewhisper.cn/`，并提供独立的本地智投页面。仓库同时保留 Vue 3 前端源码、Flask 后端源码、线上构建快照和可审计的服务器基线清单；源码实现和当前线上部署的差异见下文。
 
 ## 项目结构
 
 - `frontend/`：Vue 3 + TypeScript + Vite + Pinia + Vue Router 前端源码。
-- `backend/`：从 `/work/StockAnalyzerPro` 同步的 Flask API，包含认证、股票、板块、聊天 SSE、策略工作台和模拟交易接口。
+- `backend/`：Flask API，包含认证、股票、板块、聊天 SSE、策略工作台、模拟交易和桌面端上下文接口。
 - `desktop/`：Electron Windows 客户端。生产模式不启动本地 Python 或 MySQL，直接加载线上站点。
-- `deploy/site-snapshot/`：2026-10-06 从线上 `/work/html` 取得的网页部署快照。
+- `deploy/site-snapshot/`：2026-10-30 从线上 `/work/html` 取得的首页及其实际引用的 JS、CSS 和图标。
+- `deploy/backend-snapshot/pages/chat.py`：2026-10-30 线上聊天路由源码，用于核对仓库保留的桌面端接口差异，不作为本地应用入口。
 - `docs/server-baseline.json`：服务器文件的 SHA-256 基线及同步结果。
 - `scripts/`：基线校验和桌面冒烟脚本。
 
@@ -21,7 +22,9 @@
 
 本地模型服务使用随应用分发的轻量 llama.cpp 运行时和 ModelScope GGUF 量化权重。正式安装包只包含应用本体和推理运行时，不包含模型权重；下载完成后自动启动服务，并等待健康检查通过。本地问答仍会调用线上 `/chat/local-context` 获取 MCP 数据。
 
-桌面客户端由 Vue 首帧直接渲染独立的桌面应用壳：使用左侧工作区导航栏，将市场总览、AI 投顾、策略工作台和账号中心分开显示，并配合紧凑卡片与 Windows 风格控件。旧网页导航和旧桌面注入层已移除，下载入口只在网站端显示，桌面端会自动隐藏；所有股票、板块、AI 对话、登录和策略工作台功能仍使用同一套线上页面与服务器接口。
+截至 2026-10-30，生产后端尚未包含 `/chat/local-context`，仓库保留此接口以支持桌面端云端上下文请求。因此，本地模型运行与云端行情上下文获取是不同的验证对象，当前线上环境不能据此认定本地智投的行情数据链路已经可用，也不能将桌面端描述为完全离线应用。
+
+当前网页由 Vue 渲染桌面侧栏，分别显示市场总览、AI 投顾、策略工作台和账号中心，桌面下载入口会隐藏。Electron 保留对旧网页的侧栏注入兼容，仅对自己创建的侧栏同步导航状态；已有 Vue 侧栏由网页管理，避免旧同步逻辑覆盖视图切换。本地智投入口打开随客户端分发的页面，其余业务仍使用线上页面和服务器接口。
 
 页面切换使用统一的短时长 Web Animations 动画，快速连续点击时会取消旧动画并保留最后一次导航；系统启用“减少动态效果”时会立即展示最终状态。列表新增、删除、会话切换和桌面市场/AI 视图也使用同一套动画生命周期。
 
@@ -60,6 +63,8 @@ backend/.venv/Scripts/python backend/main.py
 
 ```powershell
 npm run verify:baseline
+npm run verify:baseline:test
+npm run backend:test:local-context
 npm run desktop:test
 npm run frontend:build
 npm run frontend:test
@@ -70,9 +75,15 @@ npm run desktop:build
 
 桌面冒烟测试会检查主界面、服务器接口未登录响应、登录跳转是否仍在同一窗口、渲染器是否隔离 Node.js、断网恢复页和重连链接。安装包构建默认关闭代码签名自动发现；发布到正式渠道时应配置 Windows 代码签名证书。
 
+`backend:test:local-context` 需要安装 Flask 的 Python 环境。它替换行情、模型和认证依赖并禁止网络，只验证仓库路由契约。2026-10-30 的构建、测试计数、桌面兼容修复和验证范围见 [docs/validation-2026-10-30.md](docs/validation-2026-10-30.md)。本次未重新发布安装包，现有 Release 不包含此次源码修复。
+
 ## 服务器同步说明
 
-服务器是运行基准。2026-10-06 通过 SSH 检查了 `/work/StockAnalyzerPro`、Gunicorn `stock-analyzer.service` 和 `/work/html`，并下载了后端有效源码与网页构建文件。服务器没有 Vue 源码，线上 JS/CSS/HTML 快照作为最终网页版本保存。生产数据库、`.env`、模型缓存和运行时数据不进入仓库。
+服务器是已部署网页版的运行基准。2026-10-30 通过只读 SSH 检查了 `/work/StockAnalyzerPro`、`stock-analyzer.service` 和 `/work/html`，服务状态为 active。清单中的 31 个后端文件有 30 个与仓库文件原始字节一致；唯一功能差异为仓库 `pages/chat.py` 增加了 `/chat/local-context`。该路由继续保留，线上原文件单独归档，清单同时记录两者哈希和差异原因。本次更新没有部署、覆盖线上文件或重启服务。
+
+网页快照仅保存当时首页实际引用的四个文件，不混入旧版构建。服务器没有 Vue 源码，当前 `frontend/` 的构建与线上快照不同，不能声称这些编译产物可由当前源码复现。生产数据库、`.env`、模型缓存和运行时数据不进入仓库。完整基线说明见 [docs/server-baseline.md](docs/server-baseline.md)。
+
+`verify:baseline` 只核对本地源码、归档文件与清单，不连接生产服务器。为兼容 Git 的 Windows/Linux 换行处理，文本哈希将 CRLF 归一化为 LF；清单中另存只读采集时的 `serverRawSha256`，作为当时服务器原始字节的记录。验证成功表示本地归档符合已记录基线，不表示当前线上部署或 Vue 构建可复现性通过验证。
 
 服务器连接示例（不要把密码写入脚本或提交记录）：
 

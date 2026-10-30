@@ -1,12 +1,17 @@
 {
-  "capturedOn": "2026-10-18",
+  "schemaVersion": 2,
+  "capturedOn": "2026-10-30",
   "timezone": "Asia/Shanghai",
   "productionOrigin": "https://www.muyewhisper.cn",
   "backendDirectory": "/work/StockAnalyzerPro",
   "webDirectory": "/work/html",
   "backendService": "stock-analyzer.service",
+  "backendServiceStatusAtCapture": "active",
+  "hashNormalization": "utf8-text-crlf-to-lf",
+  "hashNotes": "sha256 and repositorySha256 normalize CRLF to LF for UTF-8 text. serverRawSha256 records bytes observed through read-only SSH at capture time; it is historical evidence, not a live check.",
   "frontendSourceFoundOnServer": false,
   "frontendBuildByteIdentical": false,
+  "frontendBuildNotes": "The deployed HTML/JS/CSS/icon are archived independently of frontend/ source. Vue source was not present on the server and these assets are not claimed to be reproducible from the current repository source.",
   "excluded": [
     ".env",
     ".venv",
@@ -20,179 +25,209 @@
     {
       "path": "main.py",
       "sha256": "ce9ced317c52597cae4c576015f23dbf49c44b65c665db980abef046029d4bc2",
+      "serverRawSha256": "46943d6230b1c96f25688eb4cdb767a78fa0573ecd6f5d8043320c0017696a67",
       "localComparison": "identical"
     },
     {
       "path": "pages/auth.py",
       "sha256": "9b0ec87abdf74087e6c2f1532dd671acfa4cffcf80a2371e7ccbbcb702725eba",
+      "serverRawSha256": "d360aaa06feed6d45f161ab63cd8e3127edf012906a97647b859c31475e22e61",
       "localComparison": "identical"
     },
     {
       "path": "pages/chat.py",
-      "sha256": "3283a95d8b2900a6af84ba97f2aadef2f7bc70a0318ad8c90f1f4fe2739f1e9c",
-      "localComparison": "identical"
+      "sha256": "ef59db5971278fe741b3963263c32307d21726024a167723cea8abe1baf72448",
+      "serverRawSha256": "ef59db5971278fe741b3963263c32307d21726024a167723cea8abe1baf72448",
+      "localComparison": "intentional-difference",
+      "repositorySha256": "3283a95d8b2900a6af84ba97f2aadef2f7bc70a0318ad8c90f1f4fe2739f1e9c",
+      "snapshotPath": "pages/chat.py",
+      "reason": "The repository retains POST /chat/local-context for the Electron local advisor. This route was absent from the production source captured on 2026-10-30. No production deployment was performed."
     },
     {
       "path": "pages/explain.py",
       "sha256": "e9c81fcd895142b704b06476c95ddefdcb163e1ee81f88a6f94b347ce919b187",
+      "serverRawSha256": "e9c81fcd895142b704b06476c95ddefdcb163e1ee81f88a6f94b347ce919b187",
       "localComparison": "identical"
     },
     {
       "path": "pages/portfolio.py",
       "sha256": "28c054de0c04f9a8165e8a00fd167797ee3dda482a4780056baf8caa3230d2db",
+      "serverRawSha256": "28c054de0c04f9a8165e8a00fd167797ee3dda482a4780056baf8caa3230d2db",
       "localComparison": "identical"
     },
     {
       "path": "pages/profile.py",
       "sha256": "7ce536a2bc2f4657d6199913ec858fc07fc6ffeede3be3aa22ea252afd3a1809",
+      "serverRawSha256": "7ce536a2bc2f4657d6199913ec858fc07fc6ffeede3be3aa22ea252afd3a1809",
       "localComparison": "identical"
     },
     {
       "path": "pages/sectors.py",
       "sha256": "7c5d77a01786fe3f27536575fca6cdad0a11195073184756f640a6f0528bb540",
+      "serverRawSha256": "7c5d77a01786fe3f27536575fca6cdad0a11195073184756f640a6f0528bb540",
       "localComparison": "identical"
     },
     {
       "path": "pages/simulator.py",
       "sha256": "50e8acb163a290ef33216ed57d01acf4fdcc78ffc38748a8f64d292128e2b21d",
+      "serverRawSha256": "50e8acb163a290ef33216ed57d01acf4fdcc78ffc38748a8f64d292128e2b21d",
       "localComparison": "identical"
     },
     {
       "path": "pages/stocks.py",
       "sha256": "0a1d3927014c5db125f78828329456076648fccafeaa34aec2d0cc91ca28b43b",
+      "serverRawSha256": "0a1d3927014c5db125f78828329456076648fccafeaa34aec2d0cc91ca28b43b",
       "localComparison": "identical"
     },
     {
       "path": "pages/user_data.py",
       "sha256": "362e33710c4604f07d7083be31eafd57c9429e5f2c1246989f29a877a906a5cb",
+      "serverRawSha256": "2337749694b25297283b75819fed5fbb6d73db03af175e92b16ebbdd9a24f617",
       "localComparison": "identical"
     },
     {
       "path": "requirements.txt",
       "sha256": "ef35539da162f4925344a15ed7ce10042be792b578d6f11916bf922fbb22741f",
+      "serverRawSha256": "7f62f7ce18fa53843f3f983062d67a9bb47c4a80dd50b54bd7b2b27499547b8d",
       "localComparison": "identical"
     },
     {
       "path": "static/whisper.png",
       "sha256": "00b70d0d80a37c86d3033fc9ed727cb57d201c861624d83c4cd7bc06625b88c0",
+      "serverRawSha256": "00b70d0d80a37c86d3033fc9ed727cb57d201c861624d83c4cd7bc06625b88c0",
       "localComparison": "identical"
     },
     {
       "path": "utils/auth/__init__.py",
       "sha256": "ae39c2a7f6c94d11b617c6c2b4b1c0f2e2ccc17a75c6776ea3cf17dd5c169304",
+      "serverRawSha256": "54ce441472dac05ee6631e60f9a2e7cb0a220a9a24579fa432873295744f1905",
       "localComparison": "identical"
     },
     {
       "path": "utils/auth/context.py",
       "sha256": "fff6e3b414b971010020a8b5dd5c2b4ed4c9e868e3b7fa79699d6605160994e6",
+      "serverRawSha256": "fff6e3b414b971010020a8b5dd5c2b4ed4c9e868e3b7fa79699d6605160994e6",
       "localComparison": "identical"
     },
     {
       "path": "utils/auth/session.py",
       "sha256": "ec32d36861b0309bdf8757ed3599fd8ad9e7f721e98b9d1f65e65da1361bcdda",
+      "serverRawSha256": "87eaf6b51db891fec985d826eec092d3e7d22f79ab91488d6a9543dc54978db7",
       "localComparison": "identical"
     },
     {
       "path": "utils/chat_memory.py",
       "sha256": "f41e98a8e72cd68812e2fead9e3688912cf6a31361422c0f23ea909a814ad85c",
+      "serverRawSha256": "878e71b8f38931ee76251f7ed06122e8da26ede2cba7d9de3a7fa8733526b6e6",
       "localComparison": "identical"
     },
     {
       "path": "utils/db/__init__.py",
       "sha256": "661045f731413c8e50aa447c5ecbd2c6019ff9eb7b71f39dabc23b9b05df74bb",
+      "serverRawSha256": "db51511ecfb5b5156b34a61a77cb0290aae67b6db8db0bee4e80be31ba02c801",
       "localComparison": "identical"
     },
     {
       "path": "utils/db/mysql.py",
       "sha256": "3858bec37069d8b2dfb84ee9396e539130c1826479c18f76a989036a958fffb0",
+      "serverRawSha256": "a3c627334e90f912a2021a9ca9ba7d00cb797b7f7022131b8f57f8d2b6e88afa",
       "localComparison": "identical"
     },
     {
       "path": "utils/get_company_code.py",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "serverRawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "localComparison": "identical"
     },
     {
       "path": "utils/mcp/init.py",
       "sha256": "470069e02dd03d89bd68a5ea7ca7b7599f6bf7d8cc1e4551150f39a28c52c75f",
+      "serverRawSha256": "d7c5d35feb01372b07af19fd4389cccb8fbba7ce8bc32921fa4644ed9cd08d66",
       "localComparison": "identical"
     },
     {
       "path": "utils/mcp/tools.json",
       "sha256": "f28e9aa6922921ab1895960784aef6cec8b8f238303d980e11cec820d07d31d3",
+      "serverRawSha256": "904bd900ea2a7d1c61b4e3d4fbbf610fe14af7f3674c0bc92c9ec8c0df9c0fa1",
       "localComparison": "identical"
     },
     {
       "path": "utils/models/availability.py",
       "sha256": "f30459a93ba3a690c3ba4f8a5a0c5b3adbb86b68d49607cdf00a1eca39840774",
+      "serverRawSha256": "f30459a93ba3a690c3ba4f8a5a0c5b3adbb86b68d49607cdf00a1eca39840774",
       "localComparison": "identical"
     },
     {
       "path": "utils/models/deepseek.py",
       "sha256": "c794f1861abc0ea48e1ff139418eba51a5509db9b3786fafe612e99ce9f9b779",
+      "serverRawSha256": "c794f1861abc0ea48e1ff139418eba51a5509db9b3786fafe612e99ce9f9b779",
       "localComparison": "identical"
     },
     {
       "path": "utils/models/download.py",
       "sha256": "6dce99607cd9a8a3240b72fb2204de2c4e007b200a90ae064ac5fdb39ba2b3aa",
+      "serverRawSha256": "fe75a63a0840b38a560e673cb6fe78e728a9fe80719c2ab44204f2333f13b1d3",
       "localComparison": "identical"
     },
     {
       "path": "utils/models/transformer.py",
       "sha256": "0a7ecf3327e6d6e337c11c91012164119c3b4665aeb489d90bcd37e9edab2468",
+      "serverRawSha256": "5102325eea056910f51e147d6ad6673322a1eed103abbda50857748e096ed7ec",
       "localComparison": "identical"
     },
     {
       "path": "utils/sectors/__init__.py",
       "sha256": "f53826cbc11755d74ae20c93c534edfb004dbc61a456091153bfea91e9c70db2",
+      "serverRawSha256": "f53826cbc11755d74ae20c93c534edfb004dbc61a456091153bfea91e9c70db2",
       "localComparison": "identical"
     },
     {
       "path": "utils/sectors/service.py",
       "sha256": "15dac319c550f24bc8f32f54a93b1951248a838bac5206eeaa24df5fa3927463",
+      "serverRawSha256": "15dac319c550f24bc8f32f54a93b1951248a838bac5206eeaa24df5fa3927463",
       "localComparison": "identical"
     },
     {
       "path": "utils/stocks/__init__.py",
       "sha256": "526a80804beae81aa9b810328880e0ba166b0433647db46fddf7de146bf0f0d3",
+      "serverRawSha256": "526a80804beae81aa9b810328880e0ba166b0433647db46fddf7de146bf0f0d3",
       "localComparison": "identical"
     },
     {
       "path": "utils/stocks/service.py",
       "sha256": "9951b7011f3c785a1c71c843359743136139690b23af3d45b67754c0d38d47e4",
+      "serverRawSha256": "9951b7011f3c785a1c71c843359743136139690b23af3d45b67754c0d38d47e4",
       "localComparison": "identical"
     },
     {
       "path": "utils/workbench/__init__.py",
       "sha256": "639fa148de3505c56f1171e3b8642e5f9c4f6425695d933acd9c414aedc3e634",
+      "serverRawSha256": "639fa148de3505c56f1171e3b8642e5f9c4f6425695d933acd9c414aedc3e634",
       "localComparison": "identical"
     },
     {
       "path": "utils/workbench/service.py",
       "sha256": "e2c2480903e14c5d69ed0c2264c3260194d6a28e1139f396fb65f3b34ff43c39",
+      "serverRawSha256": "92d50db4f62cf8fb53b17b28cef504144c2d08310b9945a360b20b1f8346b61a",
       "localComparison": "identical"
     }
   ],
   "webFiles": [
     {
-      "path": "assets/index-D4wAsZEx.css",
-      "sha256": "ba8c3c2655d47fe0f3b9e830ea5f5aae6eb342d61fc2e29aa83612b55230cc12",
-      "localBuildMatches": true
-    },
-    {
-      "path": "assets/index-Cv51J5IX.js",
-      "sha256": "6d1881711c8f356b5a1558e3b8bf5dbc8d3156a47f76f48bb475ce33f881558a",
-      "localBuildMatches": true
-    },
-    {
       "path": "index.html",
-      "sha256": "f70ae07bfb9e0c0b7800f763218f9337a651c10f1a237c47744a49aab39cb438",
-      "localBuildMatches": true
+      "sha256": "3209aa9079b452e2ddafd8f64dfc77cfed5e8f1b0ebeb64dad8278d3fdd04b65"
+    },
+    {
+      "path": "assets/index-C0jmcq8R.js",
+      "sha256": "355ff83d4c541b6f28e026161208b8809ff41731fbbf4993a2693e0d16863d1c"
+    },
+    {
+      "path": "assets/index-CbW2Es2Q.css",
+      "sha256": "d8d1639ac64d5be48ee44ca67e8426bbf536ff09540435bfe9b888d4c543d760"
     },
     {
       "path": "site-icon.png",
-      "sha256": "513056f81f30201635f25646a44edcd70ccd99059d04d0e7d761d140833b04ff",
-      "localBuildMatches": true
+      "sha256": "513056f81f30201635f25646a44edcd70ccd99059d04d0e7d761d140833b04ff"
     }
   ]
 }

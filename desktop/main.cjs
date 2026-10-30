@@ -48,7 +48,9 @@ async function applyDesktopShell(contents) {
         if (!page || !app) return
         // Newer website builds render part of the shell in Vue. Keep their state
         // and event handlers intact, but still add the local assistant entry.
-        root.classList.add('desktop-legacy-layout')
+        let sidebar = page.querySelector('.desktop-sidebar')
+        const vueSidebar = sidebar && sidebar.dataset.desktopInjected !== 'installed'
+        root.classList.toggle('desktop-legacy-layout', !vueSidebar)
 
         const viewClasses = ['desktop-view-market', 'desktop-view-ai']
         const setView = (view) => {
@@ -77,18 +79,20 @@ async function applyDesktopShell(contents) {
             const active = item.getAttribute('data-route') === activeRoute
             item.setAttribute('aria-current', active ? 'page' : 'false')
           })
-          if (currentPath === '/') setView(currentView)
-          else page.classList.remove(...viewClasses)
+          if (currentPath === '/') {
+            if (!page.classList.contains('desktop-view-' + currentView)) setView(currentView)
+          } else page.classList.remove(...viewClasses)
 
           const status = document.querySelector('[data-desktop-session]')
           const user = document.querySelector('.user-chip-copy strong')?.textContent?.trim()
-          if (status) status.textContent = user ? user + ' · 云端已连接' : '游客 · 云端已连接'
+          const statusText = user ? user + ' · 云端已连接' : '游客 · 云端已连接'
+          if (status && status.textContent !== statusText) status.textContent = statusText
         }
 
-        let sidebar = page.querySelector('.desktop-sidebar')
         if (!sidebar) {
           sidebar = document.createElement('aside')
           sidebar.className = 'desktop-sidebar'
+          sidebar.dataset.desktopInjected = 'installed'
           sidebar.setAttribute('aria-label', '桌面工作区导航')
           sidebar.innerHTML = [
             '<div class="desktop-sidebar-brand"><strong>智能投资平台</strong><span>云端投资工作台</span></div>',
@@ -161,18 +165,19 @@ async function applyDesktopShell(contents) {
           sidebar.dataset.localAiClickHandler = 'installed'
           sidebar.addEventListener('click', (event) => {
             const target = event.target instanceof Element
-              ? event.target.closest('[data-route="local-ai"]')
+              ? event.target.closest('.desktop-sidebar-item')
               : null
             if (!target || !sidebar.contains(target)) return
+            if (target.dataset.route !== 'local-ai' && target.textContent?.trim() !== '本地智投') return
             event.preventDefault()
             event.stopImmediatePropagation()
             window.aiInvestmentDesktop?.openLocalAi?.()
           }, true)
         }
 
-        if (!window.__desktopNavigationInstalled) {
+        if (!vueSidebar && !window.__desktopNavigationInstalled) {
           window.__desktopNavigationInstalled = true
-          window.__desktopView = 'market'
+          window.__desktopView = window.__desktopView === 'ai' ? 'ai' : 'market'
           for (const method of ['pushState', 'replaceState']) {
             const original = history[method]
             history[method] = function (...args) {
@@ -197,7 +202,7 @@ async function applyDesktopShell(contents) {
           })
         }
 
-        syncNavigation()
+        if (!vueSidebar) syncNavigation()
       })()
     `, true)
   } catch (error) {
