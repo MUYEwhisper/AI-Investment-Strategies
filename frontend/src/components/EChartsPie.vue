@@ -57,7 +57,7 @@ function ensureEChartsLoaded(): Promise<void> {
 
     const script = document.createElement('script')
     script.id = 'echarts-cdn-script'
-    script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js'
+    script.src = `${import.meta.env.BASE_URL}vendor/echarts-5.6.0.min.js`
     script.async = true
     script.onload = () => resolve()
     script.onerror = () => reject(new Error('加载 ECharts 失败'))

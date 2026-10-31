@@ -165,6 +165,8 @@ const activeDesktopWorkspace = computed(() => {
 })
 function navigateDesktop(view: typeof desktopWorkspaces[number]['id']): void {
   if (view === 'market' || view === 'ai') {
+    // Installed shells still read this state when synchronizing navigation.
+    window.__desktopView = view
     desktopView.value = view
     void router.push('/')
   } else if (view === 'local-ai' && isDesktopClient) {

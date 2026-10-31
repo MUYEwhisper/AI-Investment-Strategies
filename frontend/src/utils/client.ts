@@ -1,5 +1,6 @@
 declare global {
   interface Window {
+    __desktopView?: 'market' | 'ai'
     aiInvestmentDesktop?: Readonly<{
       platform: string
       getLocalModelStatus?: () => Promise<LocalModelStatus>
