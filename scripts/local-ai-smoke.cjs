@@ -9,6 +9,8 @@ async function main() {
   const executablePath = process.argv[2] ? path.resolve(process.argv[2]) : undefined
   const env = { ...process.env, AI_INVEST_TEST_PROFILE: profile }
   delete env.ELECTRON_RUN_AS_NODE
+  let completionRequests = 0
+  const completionBodies = []
   const application = await electron.launch({
     ...(executablePath ? { executablePath, args: [] } : { args: [root] }), env, timeout: 60000,
   })
@@ -19,6 +21,8 @@ async function main() {
       if (url.pathname === '/health') {
         await route.fulfill({ json: { status: 'ok' } })
       } else if (url.pathname === '/v1/chat/completions') {
+        completionRequests += 1
+        completionBodies.push(route.request().postDataJSON())
         const frames = [
           { choices: [{ delta: { content: '### 结论\n**保持观察。**\n\n### 分析依据\n- 测试数据不足\n\n### 风险提示\n' } }] },
           { choices: [{ delta: { content: '需结合实时数据。\n<script>window.__modelHtmlExecuted = true</script>' } }] },
@@ -38,6 +42,7 @@ async function main() {
     const localButton = page.locator('.desktop-sidebar-item').filter({ hasText: '本地智投' })
     await expect(localButton).toBeVisible({ timeout: 60000 })
     await expect(localButton).toHaveCount(1)
+    await expect(page.locator('.desktop-sidebar')).toHaveAttribute('data-local-ai-click-handler', 'installed')
     await localButton.click()
     await expect.poll(() => page.url()).toContain('local-ai.html')
     await expect(page.locator('.brand strong')).toHaveText('本地智投')
@@ -57,6 +62,28 @@ async function main() {
     await expect(answer.locator('script')).toHaveCount(0)
     const unsafeOutputExecuted = await page.evaluate(() => Boolean(window.__modelHtmlExecuted))
     if (unsafeOutputExecuted) throw new Error('Untrusted model HTML was executed')
+    // A rendered answer does not prove that the next question can be entered.
+    // Exercise the actual enabled/focused composer after each completed reply.
+    for (const [index, prompt] of ['继续解释风险', '还有哪些注意事项'].entries()) {
+      await expect(composer).toBeEnabled()
+      await expect(page.locator('#send')).toBeEnabled()
+      await expect(composer).toBeFocused()
+      await composer.click()
+      await composer.pressSequentially(prompt)
+      if (index === 0) await composer.press('Enter')
+      else await page.locator('#send').click()
+      await expect(page.locator('.message.user')).toHaveCount(index + 2)
+      await expect(page.locator('.message.pending')).toHaveCount(0)
+      await expect(composer).toBeEnabled()
+      await expect(page.locator('#send')).toBeEnabled()
+      await expect(composer).toBeFocused()
+    }
+    if (completionRequests !== 3) throw new Error(`Expected three completed questions, got ${completionRequests}`)
+    const followupHistory = completionBodies[2].messages
+    if (!followupHistory.some((message) => message.role === 'user' && message.content === '继续解释风险')
+      || followupHistory.filter((message) => message.role === 'assistant').length < 2) {
+      throw new Error('Follow-up request lost the preceding conversation')
+    }
     await page.locator('#newChat').click()
     await expect(page.locator('#historyList .history-item')).toHaveCount(2)
     const persistedHistoryCount = await page.evaluate(() => JSON.parse(localStorage.getItem('ai_invest_local_chats') || '[]').length)
@@ -92,9 +119,10 @@ async function main() {
     await page.locator('#back').click()
     await expect.poll(() => page.url(), { timeout: 60000 }).toBe('https://www.muyewhisper.cn/')
     await expect.poll(() => page.locator('html').evaluate((node) => node.classList.contains('desktop-shell'))).toBe(true)
+    await expect(page.locator('.desktop-sidebar')).toHaveAttribute('data-local-ai-click-handler', 'installed')
     await localButton.click()
     await expect.poll(() => page.url(), { timeout: 60000 }).toContain('local-ai.html')
-    console.log(JSON.stringify({ localAssistant: 'bundled-page', navigation: 'passed', composer: 'visible', markdown: 'rendered' }))
+    console.log(JSON.stringify({ localAssistant: 'bundled-page', navigation: 'passed', composer: 'enabled and focused after each answer', consecutiveQuestions: completionRequests, followupHistory: 'preserved', markdown: 'rendered', modelResponses: 'deterministic SSE fixtures' }))
   } finally {
     await application.close()
     await fs.rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })

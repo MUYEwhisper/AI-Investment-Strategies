@@ -352,7 +352,12 @@
       } catch (error) {
         chat.messages = chat.messages.filter((message) => message !== answer)
         setError(error instanceof Error ? error.message : '本地模型请求失败。'); renderModel({ running: false })
-      } finally { state.busy = false; renderGpu(state.gpu); renderHistory(); renderMessages(false); persist(); $('input').focus() }
+      } finally {
+        state.busy = false
+        // Recompute disabled controls after releasing the request lock, before
+        // focusing the composer for the next question.
+        renderModel({}); renderGpu(state.gpu); renderHistory(); renderMessages(false); persist(); $('input').focus()
+      }
     }
     $('newChat').addEventListener('click', () => { if (!state.busy) createChat() })
     $('installModel').addEventListener('click', installModel)
