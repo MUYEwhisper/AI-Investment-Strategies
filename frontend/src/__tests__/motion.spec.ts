@@ -64,12 +64,14 @@ describe('motion lifecycle', () => {
     expect(animations[0]!.cancel).toHaveBeenCalledTimes(1)
   })
 
-  it('applies the final state immediately when Windows reduces motion', () => {
+  it('completes reduced motion after the current DOM patch without starting an animation', async () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
     const { element, animate } = animatedElement()
     const done = vi.fn()
     enterPage(element, done)
     expect(animate).not.toHaveBeenCalled()
+    expect(done).not.toHaveBeenCalled()
+    await Promise.resolve()
     expect(done).toHaveBeenCalledTimes(1)
   })
 })

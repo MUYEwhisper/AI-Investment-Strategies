@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { MOTION, prefersReducedMotion } from '../utils/motion'
 
 type PieItem = {
@@ -34,6 +34,27 @@ const props = withDefaults(
 )
 
 const chartRef = ref<HTMLDivElement | null>(null)
+const chartItems = computed(() => props.items.filter((item) => Number.isFinite(item.value) && item.value > 0))
+const legendIndex = ref(0)
+const selectedLegendItems = ref<Record<string, boolean>>({})
+const currentLegendItem = computed(() => chartItems.value[legendIndex.value])
+const currentLegendSelected = computed(() => selectedLegendItems.value[currentLegendItem.value?.name ?? ''] !== false)
+const colors = ['#2f80ed', '#19b58f', '#f97316', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+
+function changeLegendPage(offset: number): void {
+  legendIndex.value = Math.max(0, Math.min(chartItems.value.length - 1, legendIndex.value + offset))
+}
+
+function toggleLegendItem(): void {
+  const item = currentLegendItem.value
+  if (!item) return
+  selectedLegendItems.value = { ...selectedLegendItems.value, [item.name]: !currentLegendSelected.value }
+  renderChart()
+}
+
+watch(chartItems, (items) => {
+  legendIndex.value = Math.min(legendIndex.value, Math.max(0, items.length - 1))
+})
 
 let chartInstance: EChartsLike | null = null
 let chartLoadPromise: Promise<void> | null = null
@@ -57,7 +78,7 @@ function ensureEChartsLoaded(): Promise<void> {
 
     const script = document.createElement('script')
     script.id = 'echarts-cdn-script'
-    script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js'
+    script.src = `${import.meta.env.BASE_URL}vendor/echarts-5.6.0.min.js`
     script.async = true
     script.onload = () => resolve()
     script.onerror = () => reject(new Error('加载 ECharts 失败'))
@@ -68,9 +89,8 @@ function ensureEChartsLoaded(): Promise<void> {
 }
 
 function buildOption(): Record<string, unknown> {
-  const chartItems = props.items.filter((item) => Number.isFinite(item.value) && item.value > 0)
-  const hasData = chartItems.length > 0
-  const radius = props.mode === 'donut' ? ['56%', '78%'] : ['0%', '78%']
+  const hasData = chartItems.value.length > 0
+  const radius = props.mode === 'donut' ? ['64%', '90%'] : ['0%', '90%']
 
   return {
     animation: !prefersReducedMotion(),
@@ -82,17 +102,8 @@ function buildOption(): Record<string, unknown> {
       formatter: '{b}<br/>{a}: {c}',
     },
     legend: {
-      show: hasData,
-      type: 'scroll',
-      bottom: 0,
-      left: 'center',
-      icon: 'rect',
-      itemWidth: 10,
-      itemHeight: 10,
-      textStyle: {
-        color: '#475569',
-        fontSize: 11,
-      },
+      show: false,
+      selected: selectedLegendItems.value,
     },
     graphic: hasData
       ? undefined
@@ -114,13 +125,14 @@ function buildOption(): Record<string, unknown> {
         name: props.seriesName,
         type: 'pie',
         radius,
-        center: ['50%', '44%'],
+        center: ['50%', '50%'],
         minAngle: hasData ? 3 : 0,
         avoidLabelOverlap: true,
         label: {
           show: false,
         },
         emphasis: {
+          scaleSize: 4,
           label: {
             show: false,
           },
@@ -132,8 +144,8 @@ function buildOption(): Record<string, unknown> {
           borderColor: 'rgba(255, 255, 255, 0.95)',
           borderWidth: 2,
         },
-        data: chartItems,
-        color: ['#2f80ed', '#19b58f', '#f97316', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'],
+        data: chartItems.value,
+        color: colors,
       },
     ] : [],
   }
@@ -189,13 +201,132 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="chartRef" class="echarts-pie"></div>
+  <div class="echarts-pie">
+    <div ref="chartRef" class="echarts-canvas"></div>
+    <div
+      v-if="currentLegendItem"
+      class="chart-legend"
+      role="group"
+      :aria-label="`${seriesName}图例分页`"
+      @keydown.left.prevent="changeLegendPage(-1)"
+      @keydown.right.prevent="changeLegendPage(1)"
+      @keydown.home.prevent="legendIndex = 0"
+      @keydown.end.prevent="legendIndex = chartItems.length - 1"
+    >
+      <button
+        class="legend-current"
+        type="button"
+        :title="currentLegendItem.name"
+        :aria-label="`${currentLegendItem.name}，${currentLegendSelected ? '点击隐藏' : '点击显示'}`"
+        :aria-pressed="currentLegendSelected"
+        @click="toggleLegendItem"
+      >
+        <span class="legend-swatch" :style="{ background: currentLegendSelected ? colors[legendIndex % colors.length] : '#aaa' }" aria-hidden="true"></span>
+        <span class="legend-name">{{ currentLegendItem.name }}</span>
+      </button>
+      <div class="legend-navigation">
+        <button type="button" class="legend-page-button" :aria-label="`${seriesName}上一页`" :disabled="legendIndex === 0" @click="changeLegendPage(-1)">
+          <span aria-hidden="true">‹</span>
+        </button>
+        <span class="legend-page-count" role="status" aria-live="polite">{{ legendIndex + 1 }}/{{ chartItems.length }}</span>
+        <button type="button" class="legend-page-button" :aria-label="`${seriesName}下一页`" :disabled="legendIndex >= chartItems.length - 1" @click="changeLegendPage(1)">
+          <span aria-hidden="true">›</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
 .echarts-pie {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   width: 100%;
   height: 100%;
   min-height: 190px;
+}
+
+.echarts-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.chart-legend {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  color: #475569;
+  font-size: 11px;
+}
+
+.legend-current {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-navigation {
+  display: grid;
+  grid-template-columns: minmax(28px, 1fr) auto minmax(28px, 1fr);
+  align-items: center;
+  gap: 3px;
+}
+
+.legend-page-button {
+  height: 28px;
+  min-width: 28px;
+  padding: 0 4px;
+  border: 1px solid #d5dee8;
+  border-radius: 4px;
+  background: #f7f9fb;
+  color: #2f4554;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.legend-page-button:hover:not(:disabled) {
+  border-color: #77add6;
+  background: #eef7ff;
+}
+
+.legend-page-button:disabled {
+  color: #aaa;
+  cursor: default;
+}
+
+.legend-page-button:focus-visible,
+.legend-current:focus-visible {
+  outline: 2px solid #2f80ed;
+  outline-offset: 1px;
+}
+
+.legend-page-count {
+  min-width: 25px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 </style>

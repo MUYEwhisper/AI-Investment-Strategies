@@ -29,6 +29,34 @@ type SectorEnvelope = {
   overview?: SectorOverviewPayload
 }
 
+const SECTOR_SNAPSHOT_KEY = 'ai_invest_sector_overview:'
+
+// Electron opens the local assistant in the same window, so returning to the
+// website mounts App again. Keep the last completed analysis for this session.
+export function loadStoredSectorOverview(workspaceId: string): SectorOverviewPayload | null {
+  try {
+    const raw = sessionStorage.getItem(SECTOR_SNAPSHOT_KEY + workspaceId)
+    if (!raw) return null
+    const payload = JSON.parse(raw) as SectorOverviewPayload
+    if (!Array.isArray(payload?.sectors) || !Array.isArray(payload?.insights)) return null
+    if (!payload.sectors.every((item) => item && typeof item.name === 'string'
+      && typeof item.reason === 'string'
+      && [item.attentionScore, item.sentimentScore, item.strengthScore].every(Number.isFinite))
+      || !payload.insights.every((line) => typeof line === 'string')) return null
+    return payload
+  } catch {
+    return null
+  }
+}
+
+export function storeSectorOverview(workspaceId: string, payload: SectorOverviewPayload): void {
+  try {
+    sessionStorage.setItem(SECTOR_SNAPSHOT_KEY + workspaceId, JSON.stringify(payload))
+  } catch {
+    // A storage restriction must not discard an analysis already shown in memory.
+  }
+}
+
 export async function fetchSectorOverview(stockCodes: string[]): Promise<SectorOverviewPayload> {
   const response = await apiFetch(`${SECTOR_API_BASE}/overview`, {
     method: 'POST',

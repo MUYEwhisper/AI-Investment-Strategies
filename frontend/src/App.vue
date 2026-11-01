@@ -12,7 +12,7 @@ import {
   type StructuredChatMessage,
 } from './services/chat-memory'
 import { apiFetch } from './services/http'
-import { fetchSectorOverview, type SectorOverviewPayload } from './services/sectors'
+import { fetchSectorOverview, loadStoredSectorOverview, storeSectorOverview, type SectorOverviewPayload } from './services/sectors'
 import {
   getKsuserAuthConfig,
 } from './services/ksuser-auth'
@@ -81,6 +81,35 @@ const authConfig = ref(getKsuserAuthConfig())
 
 const messagesPanelRef = ref<HTMLElement | null>(null)
 const localMessagesPanelRef = ref<HTMLElement | null>(null)
+const sectorBodyRef = ref<HTMLElement | null>(null)
+const desktopMarketHeight = ref(1200)
+let marketLayoutObserver: ResizeObserver | null = null
+let marketLayoutFrame = 0
+
+function scheduleMarketLayout(): void {
+  if (marketLayoutFrame) cancelAnimationFrame(marketLayoutFrame)
+  marketLayoutFrame = requestAnimationFrame(() => {
+    marketLayoutFrame = 0
+    const body = sectorBodyRef.value
+    if (!body || !window.matchMedia('(min-width: 1101px)').matches) return
+    const grid = body.closest<HTMLElement>('.top-grid')
+    if (!grid || !body.clientHeight) return
+    const overflow = body.scrollHeight - body.clientHeight
+    if (overflow > 0) {
+      // Keep the reserved height on refresh/navigation; only grow for content
+      // that exceeds it, so both panels always expose the complete analysis.
+      desktopMarketHeight.value = Math.max(desktopMarketHeight.value, grid.offsetHeight + overflow + 2)
+    }
+  })
+}
+
+watch(sectorBodyRef, (body) => {
+  marketLayoutObserver?.disconnect()
+  if (!isDesktopClient || !body || typeof ResizeObserver === 'undefined') return
+  marketLayoutObserver = new ResizeObserver(scheduleMarketLayout)
+  for (const element of [body, ...body.children]) marketLayoutObserver.observe(element)
+  scheduleMarketLayout()
+}, { flush: 'post' })
 
 const stockInput = ref('')
 const chatInput = ref('')
@@ -165,6 +194,8 @@ const activeDesktopWorkspace = computed(() => {
 })
 function navigateDesktop(view: typeof desktopWorkspaces[number]['id']): void {
   if (view === 'market' || view === 'ai') {
+    // Installed shells still read this state when synchronizing navigation.
+    window.__desktopView = view
     desktopView.value = view
     void router.push('/')
   } else if (view === 'local-ai' && isDesktopClient) {
@@ -593,11 +624,16 @@ function currentSectorProbeCodes(): string[] {
 async function refreshSectorData(): Promise<void> {
   if (isSectorLoading.value) return
 
+  const workspaceId = authStore.session?.profile.openid ?? '__guest__'
   isSectorLoading.value = true
   try {
     const payload = await fetchSectorOverview(currentSectorProbeCodes())
-    sectorData.value = payload
+    storeSectorOverview(workspaceId, payload)
+    if (workspaceId === (authStore.session?.profile.openid ?? '__guest__')) {
+      sectorData.value = payload
+    }
   } catch (error) {
+    if (workspaceId !== (authStore.session?.profile.openid ?? '__guest__')) return
     const message = error instanceof Error ? error.message : '板块分析刷新失败'
     sectorData.value = {
       ...sectorData.value,
@@ -1479,7 +1515,8 @@ watch(
 
 watch(
   () => authStore.session?.profile.openid ?? '__guest__',
-  () => {
+  (workspaceId) => {
+    sectorData.value = loadStoredSectorOverview(workspaceId) ?? createEmptySectorOverview()
     void loadWatchlist()
     void loadChats()
   },
@@ -1552,6 +1589,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  marketLayoutObserver?.disconnect()
+  if (marketLayoutFrame) cancelAnimationFrame(marketLayoutFrame)
   window.removeEventListener('desktop-view-change', onDesktopViewChange)
   removeLocalModelStatusListener?.()
   activeAiAbortController?.abort()
@@ -1778,7 +1817,8 @@ onBeforeUnmount(() => {
               @leave-cancelled="cancelMotion"
             >
               <div :key="isDesktopClient ? (desktopView || 'market') : 'dashboard'" class="workspace-stage">
-              <section v-if="!isDesktopClient || desktopView !== 'ai'" class="top-grid">
+              <section v-if="!isDesktopClient || desktopView !== 'ai'" class="top-grid"
+                :style="isDesktopClient ? { '--desktop-market-height': `${desktopMarketHeight}px` } : undefined">
         <article class="panel watchlist-wrap" id="watchlistPanel">
           <div class="panel-header">
             <div>
@@ -1914,7 +1954,7 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <div class="sector-body">
+          <div ref="sectorBodyRef" class="sector-body">
             <div class="chart-card">
               <div class="card-title">板块图表分析（直观饼图）</div>
               <div v-if="sectorStatusNote" class="sector-status-note">{{ sectorStatusNote }}</div>

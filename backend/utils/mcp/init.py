@@ -26,6 +26,10 @@ class McpResourcePackageError(McpError):
     """账号没有可用资源包时抛出。"""
 
 
+class McpTimeoutError(McpError):
+    """MCP 连接或读取超时，可由只读调用方安全重试。"""
+
+
 HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
 URL_PATTERN = re.compile(r"https?://\S+")
 
@@ -78,7 +82,7 @@ def _build_mcp_error(response: requests.Response, data):
     )
 
 
-def call(method: str, params: dict):
+def call(method: str, params: dict, *, timeout: float | tuple[float, float] | None = None):
     payload = {
         "jsonrpc": "2.0",
         "id": str(uuid.uuid4()),
@@ -95,10 +99,10 @@ def call(method: str, params: dict):
             f"{MCP_URL}?apiKey={API_KEY}",
             json=payload,
             headers=headers,
-            timeout=MCP_TIMEOUT_SECONDS,
+            timeout=timeout if timeout is not None else MCP_TIMEOUT_SECONDS,
         )
     except requests.Timeout as exc:
-        raise McpError("连接今日投资 MCP 超时，请稍后重试。") from exc
+        raise McpTimeoutError("连接今日投资 MCP 超时，请稍后重试。") from exc
     except requests.RequestException as exc:
         raise McpError(_sanitize_error_message(str(exc))) from exc
 
@@ -133,13 +137,14 @@ def tool_list():
     mcp_tools = data.get("result", []).get("tools", [])
     return [mcp_to_openai_tool(t) for t in mcp_tools]
 
-def tool_call(name, arguments):
+def tool_call(name, arguments, *, timeout: float | tuple[float, float] | None = None):
     return call(
         "tools/call",
         {
             "name": name,
             "arguments": arguments
-        }
+        },
+        timeout=timeout,
     )
 
 if __name__ == "__main__":

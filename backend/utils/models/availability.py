@@ -5,8 +5,9 @@ import threading
 import time
 from typing import Any
 
+import httpx
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 
 load_dotenv()
 
@@ -44,7 +45,15 @@ _probe_cache: dict[str, Any] = {
 }
 
 
-def get_model_availability(force_refresh: bool = False) -> dict[str, Any]:
+def bounded_model_timeout(seconds: float) -> httpx.Timeout:
+    # httpx's scalar timeout applies separately to each I/O phase. Divide the
+    # remaining request budget instead of allowing every phase the full amount.
+    connect = min(3, seconds * 0.2)
+    write = pool = min(0.5, seconds * 0.025)
+    return httpx.Timeout(connect=connect, read=seconds - connect - write - pool, write=write, pool=pool)
+
+
+def get_model_availability(force_refresh: bool = False, *, timeout_seconds: float | None = None) -> dict[str, Any]:
     if ANALYSIS_CLIENT is None:
         return {
             "checkedAt": time.time(),
@@ -56,13 +65,23 @@ def get_model_availability(force_refresh: bool = False) -> dict[str, Any]:
     if not force_refresh and now - float(_probe_cache.get("checkedAt") or 0) <= MODEL_PROBE_TTL_SECONDS:
         return dict(_probe_cache)
 
-    with _probe_lock:
+    deadline = time.monotonic() + timeout_seconds if timeout_seconds is not None else None
+    acquired = _probe_lock.acquire(timeout=max(0, timeout_seconds)) if deadline is not None else _probe_lock.acquire()
+    if not acquired:
+        return {"checkedAt": now, "available": False, "reason": "模型可用性检测暂未完成，请稍后重试。"}
+    try:
         now = time.time()
         if not force_refresh and now - float(_probe_cache.get("checkedAt") or 0) <= MODEL_PROBE_TTL_SECONDS:
             return dict(_probe_cache)
 
         try:
-            ANALYSIS_CLIENT.chat.completions.create(
+            client = ANALYSIS_CLIENT
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return {"checkedAt": now, "available": False, "reason": "模型可用性检测超时，请稍后重试。"}
+                client = client.with_options(timeout=bounded_model_timeout(remaining), max_retries=0)
+            client.chat.completions.create(
                 model=ANALYSIS_MODEL,
                 messages=[{"role": "user", "content": "ping"}],
                 max_tokens=1,
@@ -79,13 +98,19 @@ def get_model_availability(force_refresh: bool = False) -> dict[str, Any]:
                 "available": False,
                 "reason": str(exc).strip() or "模型服务暂不可用",
             }
+            # A caller's short probe budget is not evidence of a provider-wide
+            # outage. Do not block other routes for the shared cache TTL.
+            if deadline is not None and isinstance(exc, (APITimeoutError, httpx.TimeoutException, TimeoutError)):
+                return result
 
         _probe_cache.update(result)
         return dict(_probe_cache)
+    finally:
+        _probe_lock.release()
 
 
-def ensure_model_available(force_refresh: bool = False) -> dict[str, Any]:
-    availability = get_model_availability(force_refresh=force_refresh)
+def ensure_model_available(force_refresh: bool = False, *, timeout_seconds: float | None = None) -> dict[str, Any]:
+    availability = get_model_availability(force_refresh=force_refresh, timeout_seconds=timeout_seconds)
     if not availability.get("available"):
         reason = str(availability.get("reason") or "模型服务暂不可用")
         raise ModelUnavailableError(reason)

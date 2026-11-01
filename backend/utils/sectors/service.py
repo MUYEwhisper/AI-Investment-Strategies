@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import utils.mcp.init as mcp
-from utils.models.availability import ensure_model_available
+from utils.models.availability import bounded_model_timeout, ensure_model_available
 from utils.stocks.service import (
     ANALYSIS_CLIENT,
     ANALYSIS_MODEL,
@@ -32,13 +32,17 @@ MAX_PROBE_CODES = 12
 MAX_MODEL_SECTORS = 12
 MAX_RETURN_SECTORS = 7
 SECTOR_CACHE_TTL_SECONDS = 300
-SECTOR_CACHE_VERSION = "v3"
+SECTOR_CACHE_VERSION = "v4"
 SECTOR_ANALYSIS_TIMEOUT_SECONDS = max(12, int(os.environ.get("STOCK_SECTOR_ANALYSIS_TIMEOUT_SECONDS", "60")))
 SECTOR_ANALYSIS_RETRY_COUNT = max(0, int(os.environ.get("STOCK_SECTOR_ANALYSIS_RETRY_COUNT", "1")))
 SECTOR_ANALYSIS_RETRY_BACKOFF_SECONDS = max(
     0.5, float(os.environ.get("STOCK_SECTOR_ANALYSIS_RETRY_BACKOFF_SECONDS", "1.5"))
 )
 SECTOR_MERGE_MAX_WORKERS = max(1, int(os.environ.get("STOCK_SECTOR_MERGE_MAX_WORKERS", "4")))
+SECTOR_MCP_READ_TIMEOUT_SECONDS = max(8, float(os.environ.get("STOCK_SECTOR_MCP_READ_TIMEOUT_SECONDS", "30")))
+SECTOR_MCP_RETRY_COUNT = max(0, min(1, int(os.environ.get("STOCK_SECTOR_MCP_RETRY_COUNT", "1"))))
+SECTOR_MCP_TOTAL_TIMEOUT_SECONDS = max(10, min(45, float(os.environ.get("STOCK_SECTOR_MCP_TOTAL_TIMEOUT_SECONDS", "45"))))
+SECTOR_TOTAL_TIMEOUT_SECONDS = max(30, min(90, float(os.environ.get("STOCK_SECTOR_TOTAL_TIMEOUT_SECONDS", "85"))))
 
 CACHE_DIR = PROJECT_ROOT / "cache" / "sector_service"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -50,7 +54,7 @@ class SectorServiceError(RuntimeError):
 
 def _model_gate_reason() -> str | None:
     try:
-        ensure_model_available()
+        ensure_model_available(timeout_seconds=5)
         return None
     except Exception as exc:
         return f"AI 模型当前不可用，已跳过 MCP 市场数据拉取以避免额度浪费：{exc}"
@@ -96,20 +100,42 @@ def _normalize_probe_codes(stock_codes: list[Any] | None) -> list[str]:
     return DEFAULT_PROBE_CODES[:]
 
 
-def _fetch_sector_candidates_for_code(stock_code: str) -> list[dict[str, Any]]:
-    merge_payload = _unpack_mcp_result(mcp.tool_call("get_stock_realtime_quote_merge", {"stockCode": stock_code}))
+def _call_sector_read_tool(name: str, arguments: dict[str, Any], *, deadline: float | None = None) -> Any:
+    # These three tools only read market data. A cold merged-quote lookup can
+    # exceed the general 8s MCP budget; retry it once without repeating any
+    # successful stock requests or changing timeout policy for other callers.
+    for attempt in range(SECTOR_MCP_RETRY_COUNT + 1):
+        remaining = deadline - time.monotonic() if deadline is not None else None
+        if remaining is not None and remaining <= 0:
+            raise mcp.McpTimeoutError("板块行情读取已达到本次刷新时限，请稍后重试。")
+        connect_timeout = min(5, remaining / 2) if remaining is not None else 5
+        read_timeout = min(SECTOR_MCP_READ_TIMEOUT_SECONDS, remaining - connect_timeout) if remaining is not None else SECTOR_MCP_READ_TIMEOUT_SECONDS
+        try:
+            return mcp.tool_call(name, arguments, timeout=(connect_timeout, read_timeout))
+        except mcp.McpResourcePackageError:
+            raise
+        except mcp.McpError as exc:
+            retryable = isinstance(exc, mcp.McpTimeoutError) or exc.status_code in (429, 502, 503, 504)
+            if not retryable or attempt >= SECTOR_MCP_RETRY_COUNT:
+                raise
+            pause = min(0.5, max(0, deadline - time.monotonic())) if deadline is not None else 0.5
+            time.sleep(pause)
+
+
+def _fetch_sector_candidates_for_code(stock_code: str, *, deadline: float | None = None) -> list[dict[str, Any]]:
+    merge_payload = _unpack_mcp_result(_call_sector_read_tool("get_stock_realtime_quote_merge", {"stockCode": stock_code}, deadline=deadline))
     return _extract_sector_candidates(merge_payload, stock_code)
 
 
-def _fetch_market_summary() -> dict[str, Any]:
-    market_payload = _unpack_mcp_result(mcp.tool_call("get_market_change_ratio_status", {}))
+def _fetch_market_summary(*, deadline: float | None = None) -> dict[str, Any]:
+    market_payload = _unpack_mcp_result(_call_sector_read_tool("get_market_change_ratio_status", {}, deadline=deadline))
     return _extract_market_summary(market_payload)
 
 
-def _fetch_recent_news_items() -> list[dict[str, Any]]:
+def _fetch_recent_news_items(*, deadline: float | None = None) -> list[dict[str, Any]]:
     now = datetime.now()
     recent_news = _unpack_mcp_result(
-        mcp.tool_call(
+        _call_sector_read_tool(
             "list_news",
             {
                 "beginTime": (now - timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S"),
@@ -117,6 +143,7 @@ def _fetch_recent_news_items() -> list[dict[str, Any]]:
                 "pageNum": 1,
                 "pageSize": 12,
             },
+            deadline=deadline,
         )
     )
     return _extract_news_items(recent_news)
@@ -406,6 +433,8 @@ def _analyze_sector_overview_with_model(
     market_summary: dict[str, Any],
     news_items: list[dict[str, Any]],
     source_note: str,
+    *,
+    deadline: float | None = None,
 ) -> dict[str, Any]:
     if ANALYSIS_CLIENT is None:
         return {"error": "未配置 AI 接口密钥（STOCK_ANALYSIS_API_KEY）", "sectors": [], "insights": []}
@@ -445,9 +474,14 @@ def _analyze_sector_overview_with_model(
 
     last_error = ""
     for attempt in range(SECTOR_ANALYSIS_RETRY_COUNT + 1):
+        remaining = deadline - time.monotonic() if deadline is not None else None
+        if remaining is not None and remaining <= 0:
+            last_error = "板块分析已达到本次刷新时限，已保留行情聚合结果。"
+            break
+        timeout = min(SECTOR_ANALYSIS_TIMEOUT_SECONDS, remaining) if remaining is not None else SECTOR_ANALYSIS_TIMEOUT_SECONDS
         try:
             response = ANALYSIS_CLIENT.with_options(
-                timeout=SECTOR_ANALYSIS_TIMEOUT_SECONDS,
+                timeout=bounded_model_timeout(timeout) if deadline is not None else timeout,
                 max_retries=0,
             ).chat.completions.create(
                 model=ANALYSIS_MODEL,
@@ -468,6 +502,8 @@ def _analyze_sector_overview_with_model(
             if attempt >= SECTOR_ANALYSIS_RETRY_COUNT or not is_retryable_model_error(last_error):
                 break
             sleep_seconds = SECTOR_ANALYSIS_RETRY_BACKOFF_SECONDS * (2**attempt)
+            if deadline is not None:
+                sleep_seconds = min(sleep_seconds, max(0, deadline - time.monotonic()))
             time.sleep(sleep_seconds)
 
     return {"error": last_error, "sectors": [], "insights": []}
@@ -593,6 +629,7 @@ def _empty_sector_overview(
 
 
 def get_sector_overview(stock_codes: list[Any] | None) -> dict[str, Any]:
+    deadline = time.monotonic() + SECTOR_TOTAL_TIMEOUT_SECONDS
     probe_codes = _normalize_probe_codes(stock_codes)
     source_note = f"基于 {len(probe_codes)} 只自选股关联的 MCP 行业/概念板块聚合"
     cache_entry = _load_cache(probe_codes)
@@ -623,27 +660,51 @@ def get_sector_overview(stock_codes: list[Any] | None) -> dict[str, Any]:
         market_summary: dict[str, Any] = {}
         news_items: list[dict[str, Any]] = []
         sector_candidates: list[dict[str, Any]] = []
+        failed_codes: list[str] = []
         max_workers = (min(SECTOR_MERGE_MAX_WORKERS, len(probe_codes)) or 1) + 2
+        data_deadline = min(deadline, time.monotonic() + SECTOR_MCP_TOTAL_TIMEOUT_SECONDS)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            market_future = executor.submit(_fetch_market_summary)
-            news_future = executor.submit(_fetch_recent_news_items)
-            future_to_code = {executor.submit(_fetch_sector_candidates_for_code, code): code for code in probe_codes}
+            market_future = executor.submit(_fetch_market_summary, deadline=data_deadline)
+            news_future = executor.submit(_fetch_recent_news_items, deadline=data_deadline)
+            future_to_code = {executor.submit(_fetch_sector_candidates_for_code, code, deadline=data_deadline): code for code in probe_codes}
             for future in as_completed(future_to_code):
                 code = future_to_code[future]
                 try:
                     sector_candidates.extend(future.result())
+                except mcp.McpResourcePackageError:
+                    raise
                 except Exception as exc:
+                    failed_codes.append(code)
                     status_note = _join_notes(status_note, f"股票 {code} 的关联板块提取失败：{exc}")
 
             try:
                 market_summary = market_future.result()
+            except mcp.McpResourcePackageError:
+                raise
             except Exception as exc:
                 status_note = _join_notes(status_note, f"MCP 市场总览获取失败，已使用板块聚合降级：{exc}")
 
             try:
                 news_items = news_future.result()
+            except mcp.McpResourcePackageError:
+                raise
             except Exception as exc:
                 status_note = _join_notes(status_note, f"MCP 新闻获取失败，已继续生成板块评分：{exc}")
+
+        if failed_codes and isinstance(cached_payload, dict):
+            cached_copy = dict(cached_payload)
+            overview = dict(cached_copy.get("overview") or {})
+            overview["statusNote"] = _join_notes(
+                overview.get("statusNote"),
+                f"部分自选股板块暂未刷新，当前保留最近一次完整分析。{status_note or ''}",
+            )
+            cached_copy["overview"] = overview
+            cached_copy["meta"] = {
+                **dict(cached_copy.get("meta") or {}),
+                "mcpStatus": "cache_stale",
+                "failedStockCodes": sorted(failed_codes),
+            }
+            return cached_copy
 
         aggregated_sectors = _aggregate_sector_candidates(sector_candidates)
         if not aggregated_sectors:
@@ -656,12 +717,14 @@ def get_sector_overview(stock_codes: list[Any] | None) -> dict[str, Any]:
                     "detailLoaded": False,
                 },
                 "meta": {
-                    "mcpStatus": "ready",
+                    "mcpStatus": "partial" if failed_codes else "ready",
                     "timestamp": int(time.time()),
                     "probeStockCodes": probe_codes,
+                    "failedStockCodes": sorted(failed_codes),
                 },
             }
-            _save_cache(probe_codes, payload)
+            if not failed_codes:
+                _save_cache(probe_codes, payload)
             return payload
 
         analysis_result = _analyze_sector_overview_with_model(
@@ -669,6 +732,7 @@ def get_sector_overview(stock_codes: list[Any] | None) -> dict[str, Any]:
             market_summary,
             news_items,
             source_note,
+            deadline=deadline,
         )
 
         payload = {
@@ -679,12 +743,14 @@ def get_sector_overview(stock_codes: list[Any] | None) -> dict[str, Any]:
                 source_note=source_note,
             ),
             "meta": {
-                "mcpStatus": "ready",
+                "mcpStatus": "partial" if failed_codes else "ready",
                 "timestamp": int(time.time()),
                 "probeStockCodes": probe_codes,
+                "failedStockCodes": sorted(failed_codes),
             },
         }
-        _save_cache(probe_codes, payload)
+        if not failed_codes:
+            _save_cache(probe_codes, payload)
         return payload
     except mcp.McpResourcePackageError:
         quota_note = (

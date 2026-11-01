@@ -14,7 +14,9 @@ export function cancelMotion(element: Element): void {
 export function playMotion(element: Element, frames: Keyframe[], duration: number, done: () => void): void {
   cancelMotion(element)
   if (prefersReducedMotion() || typeof element.animate !== 'function') {
-    done()
+    // Vue's out-in transition must finish its DOM patch before afterLeave can
+    // render the next page. A synchronous done() can re-enter that same patch.
+    queueMicrotask(done)
     return
   }
   const animation = element.animate(frames, { duration, easing, fill: 'both' })

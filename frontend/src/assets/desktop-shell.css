@@ -408,7 +408,37 @@
 }
 
 .desktop-shell .top-grid {
-  height: clamp(470px, 58vh, 640px);
+  height: auto;
+}
+
+.desktop-shell .top-grid > .panel {
+  height: auto;
+}
+
+/* Analysis content stays fully visible. Desktop reserves the same generous
+   height before and after loading; unusually long responses can only grow it. */
+.desktop-shell .sector-body {
+  overflow-y: visible;
+  align-content: start;
+}
+
+.desktop-shell .sector-panel .insight-list {
+  flex: 0 0 auto;
+  overflow-y: visible;
+}
+
+.desktop-shell .sector-panel .panel-header {
+  flex-shrink: 0;
+}
+
+@media (min-width: 1101px) {
+  .desktop-shell .top-grid {
+    height: var(--desktop-market-height, 1200px);
+  }
+
+  .desktop-shell .top-grid > .panel {
+    height: 100%;
+  }
 }
 
 .desktop-shell.desktop-legacy-layout .app-page.desktop-view-market .chat-panel {
@@ -474,6 +504,7 @@
 }
 
 .desktop-shell .add-stock input {
+  min-width: 0;
   border-color: #ccd9e5;
   border-radius: 6px;
   background: #ffffff !important;
