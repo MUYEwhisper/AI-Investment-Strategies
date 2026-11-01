@@ -455,6 +455,13 @@
   min-height: 540px;
 }
 
+@media (min-width: 761px) {
+  .desktop-shell .app-page.desktop-view-ai .chat-panel:not(.local-ai-chat-panel) {
+    height: calc(100vh - 122px);
+    min-height: 540px;
+  }
+}
+
 /* Vue owns workspace visibility in the current desktop shell. Keeping the
    transition on the workspace node lets the outgoing view finish its fade
    before the incoming view is mounted. */
