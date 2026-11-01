@@ -35,7 +35,9 @@ function listFiles(directory, prefix = '') {
   })
 }
 
-function verifyBaseline(root) {
+function verifyBaseline(root, options = {}) {
+  const repositoryRoot = options.repositoryRoot === undefined ? root : options.repositoryRoot
+  if (typeof repositoryRoot !== 'string' || !repositoryRoot.trim()) throw new Error('Invalid repository root')
   const baseline = JSON.parse(fs.readFileSync(path.join(root, 'docs/server-baseline.json'), 'utf8'))
   if (baseline.schemaVersion !== 2 || baseline.hashNormalization !== 'utf8-text-crlf-to-lf') {
     throw new Error('Unsupported server baseline schema or hash normalization')
@@ -45,7 +47,9 @@ function verifyBaseline(root) {
   let intentionalDifferences = 0
   for (const entry of baseline.backendFiles) {
     if (!sha256Pattern.test(entry.serverRawSha256 || '')) throw new Error(`Missing captured raw hash: ${entry.path}`)
-    const repositoryFile = resolveInside(path.join(root, 'backend'), entry.path)
+    // Only source files may come from an explicitly selected historical tree.
+    // The manifest and captured deployment artifacts always belong to root.
+    const repositoryFile = resolveInside(path.join(repositoryRoot, 'backend'), entry.path)
     if (entry.localComparison === 'identical') {
       if (entry.repositorySha256 || entry.snapshotPath) throw new Error(`Unexplained baseline metadata: ${entry.path}`)
       verifyHash(repositoryFile, entry.sha256)
@@ -84,8 +88,19 @@ function verifyBaseline(root) {
 }
 
 if (require.main === module) {
-  const result = verifyBaseline(path.resolve(__dirname, '..'))
+  const options = {}
+  const args = process.argv.slice(2)
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] !== '--repository-root' || options.repositoryRoot !== undefined) {
+      throw new Error(`Unknown or repeated argument: ${args[index]}`)
+    }
+    const value = args[++index]
+    if (!value || value.startsWith('--')) throw new Error('--repository-root requires a path')
+    options.repositoryRoot = path.resolve(value)
+  }
+  const result = verifyBaseline(path.resolve(__dirname, '..'), options)
   console.log(`Verified ${result.checked} local baseline artifacts (SHA-256, UTF-8 text normalized to LF).`)
+  if (options.repositoryRoot) console.log(`Backend source tree: ${options.repositoryRoot}`)
   console.log(`Backend: ${result.identicalBackend} match the captured server source; ${result.intentionalDifferences} documented repository/deployment difference(s).`)
   console.log(`Web: ${result.webFiles} captured deployment files; this check does not contact production or prove a reproducible Vue build.`)
 }

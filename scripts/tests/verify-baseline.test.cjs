@@ -3,6 +3,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
+const { spawnSync } = require('node:child_process')
 const { verifyBaseline, hashFile } = require('../verify-baseline.cjs')
 
 function fixture(t) {
@@ -71,4 +72,57 @@ test('rejects a recorded web resource not referenced by the current HTML', (t) =
   f.manifest.webFiles[0].sha256 = hashFile(path.join(f.root, 'deploy/site-snapshot/index.html'))
   f.save()
   assert.throws(() => verifyBaseline(f.root), /exactly the files referenced/)
+})
+
+function historicalRepository(f) {
+  const repositoryRoot = path.join(f.root, 'historical-source')
+  fs.cpSync(path.join(f.root, 'backend'), path.join(repositoryRoot, 'backend'), { recursive: true })
+  return repositoryRoot
+}
+
+test('an explicit historical source tree permits current implementation changes without relaxing the default check', (t) => {
+  const f = fixture(t)
+  const repositoryRoot = historicalRepository(f)
+  f.write('backend/main.py', 'app = 2\n')
+  f.write('backend/pages/chat.py', 'current_implementation = True\n')
+  assert.throws(() => verifyBaseline(f.root), /Server baseline mismatch/)
+  assert.deepEqual(verifyBaseline(f.root, { repositoryRoot }), {
+    checked: 5, identicalBackend: 1, intentionalDifferences: 1, webFiles: 2,
+  })
+})
+
+test('rejects modifications in the selected historical source tree', (t) => {
+  const f = fixture(t)
+  const repositoryRoot = historicalRepository(f)
+  fs.writeFileSync(path.join(repositoryRoot, 'backend/main.py'), 'app = 9\n')
+  assert.throws(() => verifyBaseline(f.root, { repositoryRoot }), /Server baseline mismatch/)
+})
+
+test('historical source selection still validates the current captured backend archive', (t) => {
+  const f = fixture(t)
+  const repositoryRoot = historicalRepository(f)
+  f.write('deploy/backend-snapshot/pages/chat.py', 'tampered_archive = True\n')
+  assert.throws(() => verifyBaseline(f.root, { repositoryRoot }), /Server baseline mismatch/)
+})
+
+test('historical source selection still validates the current captured web archive', (t) => {
+  const f = fixture(t)
+  const repositoryRoot = historicalRepository(f)
+  f.write('deploy/site-snapshot/assets/app.js', 'tamperedArchive()\n')
+  assert.throws(() => verifyBaseline(f.root, { repositoryRoot }), /Server baseline mismatch/)
+})
+
+test('CLI rejects unknown options and missing historical source paths before verification', () => {
+  const script = path.join(__dirname, '..', 'verify-baseline.cjs')
+  for (const [args, expected] of [
+    [['--ignore-mismatch'], /Unknown or repeated argument/],
+    [['--repository-root'], /--repository-root requires a path/],
+    [['--repository-root', '--unknown'], /--repository-root requires a path/],
+    [['--repository-root', '.', '--repository-root', '.'], /Unknown or repeated argument/],
+  ]) {
+    const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' })
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, expected)
+    assert.doesNotMatch(result.stderr, /Server baseline mismatch/)
+  }
 })

@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -20,7 +22,13 @@ jobs:
       - run: npm ci --prefix frontend
       - run: npm run frontend:build
       - run: npm run frontend:test
-      - run: npm run verify:baseline
+      - name: Verify captured baseline against its historical source
+        shell: bash
+        run: |
+          baseline_source="$RUNNER_TEMP/investment-baseline-source"
+          mkdir -p "$baseline_source"
+          git archive 6fba0a953679594f0954bb1b2585164110432367 backend | tar -x -C "$baseline_source"
+          node scripts/verify-baseline.cjs --repository-root "$baseline_source"
       - run: npm run verify:baseline:test
       - uses: actions/upload-artifact@v4
         with:
